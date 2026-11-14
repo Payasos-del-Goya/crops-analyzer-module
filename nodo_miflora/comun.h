@@ -23,8 +23,9 @@
 #define PERIODO_ESTADO_MS        60000UL   // estado de la placa
 #define PERIODO_ANUNCIO_MS       10000UL   // el puente anuncia quién es
 #define PERIODO_LOG_MS           60000UL   // una línea de resumen por el puerto serie
-#define MESH_DEBUG               ERROR     // painlessMesh: solo errores (STARTUP|CONNECTION para depurar la malla)
+#define MESH_DEBUG               (ERROR | CONNECTION)  // painlessMesh: errores + altas/bajas de la malla (dejar en ERROR cuando esté estable)
 #define WDT_TIMEOUT_S            30        // si loop() se atasca 30 s, la placa se reinicia
+#define MAX_SIN_PUENTE_MS        180000UL  // nodo: si no oye al puente en 3 min (18 anuncios), se reinicia
 
 // Nombre corto de cada placa según su MAC (se usa como "dispositivo" en la base de datos)
 struct Dispositivo { const char* mac; const char* nombre; };
@@ -99,6 +100,7 @@ inline void logMemoria(const char* extra)
 
 // ---- Solo nodos: envío al puente ----
 static uint32_t g_puenteId = 0;        // nodeId del puente (lo aprendemos de su anuncio)
+static uint32_t g_ultimoAnuncioMs = 0; // millis() del último anuncio del puente
 
 // Procesa un anuncio "P|<nombre>" del puente. Devuelve true si el mensaje era un anuncio.
 inline bool procesarAnuncioPuente(uint32_t from, const String& msg)
@@ -106,7 +108,22 @@ inline bool procesarAnuncioPuente(uint32_t from, const String& msg)
   if (!msg.startsWith("P|")) return false;
   if (g_puenteId != from) Serial.printf("Puente encontrado: %s\n", msg.c_str() + 2);
   g_puenteId = from;
+  g_ultimoAnuncioMs = millis();
   return true;
+}
+
+// Reinicio de seguridad del nodo (llamar en loop()). Si la malla se corta, a veces el nodo no
+// vuelve a conectarse solo y se queda mudo sin que salte el watchdog (loop() sigue girando).
+// El puente se anuncia cada PERIODO_ANUNCIO_MS: si dejamos de oírlo, mejor reiniciar.
+inline void vigilarPuente(painlessMesh& mesh)
+{
+  if (millis() - g_ultimoAnuncioMs > MAX_SIN_PUENTE_MS)
+  {
+    Serial.printf("REINICIO: %lu s sin oír al puente (nodos en la malla: %u)\n",
+                  (unsigned long)((millis() - g_ultimoAnuncioMs) / 1000), (unsigned)mesh.getNodeList().size());
+    delay(100);
+    ESP.restart();
+  }
 }
 
 // Envía "<tipo>|<dispositivo>|<json>" directamente al puente (no a toda la malla)
