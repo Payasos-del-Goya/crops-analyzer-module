@@ -1,0 +1,9 @@
+{
+  "additionalFiles": "../..,../..",
+  "compiler.optimization_flags": "-Os",
+  "customBuildProperties": "",
+  "fqbn": "esp32:esp32:esp32",
+  "hardwareFolders": "/private/tmp/claude-501/-Users-gabriel-nasa/623f9107-87a5-4d7c-880a-51152a57b124/scratchpad/arduino/data/packages/esp32/hardware/esp32/3.3.12,/private/tmp/claude-501/-Users-gabriel-nasa/623f9107-87a5-4d7c-880a-51152a57b124/scratchpad/arduino/data/packages/esp32/hardware/esp32/3.3.12",
+  "otherLibrariesFolders": "/private/tmp/claude-501/-Users-gabriel-nasa/623f9107-87a5-4d7c-880a-51152a57b124/scratchpad/arduino/user/libraries",
+  "sketchLocation": "/Users/gabriel/nasa/esp32_baliza"
+}

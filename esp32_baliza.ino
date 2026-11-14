@@ -1,107 +1,136 @@
 #include "painlessMesh.h"
 #include <Arduino_JSON.h>
 #include <WiFi.h>
-#include <SPIFFS.h>
 #include <PubSubClient.h>
 
-#include "mqtt_config.h"
+#include "config.h"
 #include "MQTT.hpp"
-#include "ESP32_Utils.hpp"
-#include "ESP32_Utils_MQTT.hpp"
-
-#define   MESH_PREFIX     "MyMeshNetwork"
-#define   MESH_PASSWORD   "somethingSneaky"
-#define   MESH_PORT       5555
 
 Scheduler userScheduler; // to control your personal task
 painlessMesh mesh;
 
-int nodeNumber = 1;
-const int MQTT_NODE_NUMBER = 1;
+bool isBridge = false;          // se decide en setup() comparando la MAC con BRIDGE_MAC
+uint32_t seq = 0;               // contador de mensajes de este nodo
+IPAddress stationIP(0, 0, 0, 0);
 
-String readings;
+void sendMessage();
+Task taskSendMessage(TASK_SECOND * 5, TASK_FOREVER, &sendMessage);
 
-// User stub
-void sendMessage(); // Prototype so PlatformIO doesn't complain
-String getReadings();
-
-Task taskSendMessage(TASK_SECOND * 1, TASK_FOREVER, &sendMessage);
-
-int random_read(int min, int max) {
-  return rand() % (max - min + 1) + min;
+String macString()
+{
+  uint64_t mac = ESP.getEfuseMac();   // byte 0 de la MAC en los bits bajos
+  char buf[18];
+  snprintf(buf, sizeof(buf), "%02X:%02X:%02X:%02X:%02X:%02X",
+           (uint8_t)(mac), (uint8_t)(mac >> 8), (uint8_t)(mac >> 16),
+           (uint8_t)(mac >> 24), (uint8_t)(mac >> 32), (uint8_t)(mac >> 40));
+  return String(buf);
 }
 
-String getReadings() {
-  JSONVar jsonReadings;
-  jsonReadings["node"] = nodeNumber;
-  jsonReadings["temp"] = random_read(0, 50);
-  jsonReadings["hum"] = random_read(0, 100);
-  readings = JSON.stringify(jsonReadings);
-  return readings;
+// Lecturas en JSON válido, con el id del nodo DENTRO del JSON.
+String getReadings()
+{
+  JSONVar j;
+  j["node"] = String(mesh.getNodeId());
+  j["seq"] = (double)seq++;
+  j["temp"] = (int)random(0, 51);      // random() usa el generador hardware del ESP32
+  j["hum"] = (int)random(0, 101);
+  j["simulado"] = READINGS_SIMULATED;
+  return JSON.stringify(j);
 }
 
-void sendMessage() {
+void sendMessage()
+{
   String msg = getReadings();
-  msg += mesh.getNodeId();
+  if (isBridge)
+  {
+    PublishReadings(mesh.getNodeId(), msg);   // sendBroadcast no se entrega a uno mismo
+  }
   mesh.sendBroadcast(msg);
-  taskSendMessage.setInterval(random(TASK_SECOND * 1, TASK_SECOND * 5));
+  taskSendMessage.setInterval(random(TASK_SECOND * 3, TASK_SECOND * 7));
 }
 
-// Needed for painless library
-void receivedCallback(uint32_t from, String &msg) {
-  Serial.printf("startHere: Received from %u msg=%s\n", from, msg.c_str());
-  if (nodeNumber == MQTT_NODE_NUMBER) {
-    PublisMqtt(msg.c_str());
+// Mensajes recibidos por la malla
+void receivedCallback(uint32_t from, String &msg)
+{
+  Serial.printf("Malla: de %u: %s\n", from, msg.c_str());
+  if (isBridge && msg.startsWith("{"))
+  {
+    PublishReadings(from, msg);
   }
 }
 
-void newConnectionCallback(uint32_t nodeId) {
-    Serial.printf("--> startHere: New Connection, nodeId = %u\n", nodeId);
+// Mensajes MQTT recibidos por el puente: lo publicado en MQTT_TOPIC_BROADCAST se reenvía a la malla
+void OnMqttReceived(char* topic, byte* payload, unsigned int length)
+{
+  String content;
+  content.reserve(length);
+  for (unsigned int i = 0; i < length; i++) content.concat((char)payload[i]);
+  Serial.printf("MQTT: %s: %s\n", topic, content.c_str());
+  if (String(topic) == MQTT_TOPIC_BROADCAST)
+  {
+    mesh.sendBroadcast(content);
+  }
 }
 
-void changedConnectionCallback() {
-  Serial.printf("Changed connections\n");
+void newConnectionCallback(uint32_t nodeId)
+{
+  Serial.printf("Malla: nueva conexión, nodeId = %u\n", nodeId);
 }
 
-void nodeTimeAdjustedCallback(int32_t offset) {
-    Serial.printf("Adjusted time %u. Offset = %d\n", mesh.getNodeTime(),offset);
+void changedConnectionCallback()
+{
+  Serial.printf("Malla: conexiones cambiadas, nodos = %u\n", mesh.getNodeList().size());
 }
 
-void setup() {
+void setup()
+{
   Serial.begin(115200);
 
-  // 1. Formatear si falla el montaje (o eliminar si no se usa)
-  if (!SPIFFS.begin(true)) {
-    Serial.println("Error montando SPIFFS");
-  }
+  String mac = macString();
+  isBridge = mac.equalsIgnoreCase(BRIDGE_MAC);
+  Serial.printf("\nBaliza %s -> rol: %s\n", mac.c_str(), isBridge ? "PUENTE" : "nodo");
 
-  // 2. Configurar debug e inicializar Mesh (indicando el canal de tu router, ej. 6)
   mesh.setDebugMsgTypes(ERROR | STARTUP | CONNECTION);
-  mesh.init(MESH_PREFIX, MESH_PASSWORD, &userScheduler, MESH_PORT, WIFI_AP_STA, 1);
-  
-  // 3. Conectar el nodo puente al router a través de painlessMesh
-  mesh.stationManual("fieldshift", "somethingSneaky");
-  mesh.setHostname("ESP32_Mesh_Bridge");
+  mesh.init(MESH_PREFIX, MESH_PASSWORD, &userScheduler, MESH_PORT, WIFI_AP_STA, MESH_CHANNEL);
+
+  if (isBridge)
+  {
+    // Solo el puente reserva su interfaz STA para la WiFi de la Raspberry Pi.
+    // Los demás nodos la usan para engancharse a otros nodos y formar la malla.
+    mesh.stationManual(STATION_SSID, STATION_PASSWORD);
+    mesh.setHostname(BRIDGE_HOSTNAME);
+    mesh.setRoot(true);
+
+    // Muestra el motivo de cada desconexión de la WiFi fieldshift (diagnóstico)
+    WiFi.onEvent([](WiFiEvent_t event, WiFiEventInfo_t info) {
+      Serial.printf("WiFi STA desconectada, motivo=%u\n", info.wifi_sta_disconnected.reason);
+    }, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
+
+    InitMqtt(mesh.getNodeId());
+  }
+  mesh.setContainsRoot(true);   // todos saben que la malla tiene un puente
 
   mesh.onReceive(&receivedCallback);
   mesh.onNewConnection(&newConnectionCallback);
   mesh.onChangedConnections(&changedConnectionCallback);
-  mesh.onNodeTimeAdjusted(&nodeTimeAdjustedCallback);
-
-  // 4. Inicializar configuración del servidor MQTT
-  if (nodeNumber == MQTT_NODE_NUMBER) {
-    InitMqtt();
-  }
 
   userScheduler.addTask(taskSendMessage);
   taskSendMessage.enable();
 }
 
-void loop() {
+void loop()
+{
   mesh.update();
-  
-  // Mantener viva la conexión MQTT solo cuando el ESP32 tenga IP del router
-  if (nodeNumber == MQTT_NODE_NUMBER && WiFi.status() == WL_CONNECTED) {
-    HandleMqtt();
+
+  if (isBridge)
+  {
+    IPAddress ip(mesh.getStationIP());
+    if (ip != stationIP)
+    {
+      stationIP = ip;
+      Serial.printf("WiFi %s: IP %s\n", STATION_SSID, ip.toString().c_str());
+    }
+    // Se llama SIEMPRE (no solo con WiFi.status()==WL_CONNECTED) para mantener vivo el keepalive
+    HandleMqtt(ip != IPAddress(0, 0, 0, 0));
   }
 }
