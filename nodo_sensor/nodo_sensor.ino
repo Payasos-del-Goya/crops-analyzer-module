@@ -38,25 +38,12 @@ void enviarLecturas()
 {
   char json[TAM_JSON];
 
-  // Luz: dato real, en su propio mensaje (sin "simulado")
   ultimaLuz = leerLuz();
   snprintf(json, sizeof(json),
     "{\"finca\":\"%s\",\"dispositivo\":\"%s\",\"luz_lux\":%.0f}",
     FINCA, g_nombre, ultimaLuz);
   enviarAlPuente(mesh, "atmosfera", json);
 
-  // Resto: simulado y marcado
-  snprintf(json, sizeof(json),
-    "{\"finca\":\"%s\",\"zona\":\"%s\",\"dispositivo\":\"%s\",\"tipo\":\"simulado\",\"profundidad_cm\":20,"
-    "\"humedad_vol\":%.1f,\"conductividad\":%.2f,\"temperatura\":%.1f}",
-    FINCA, ZONA, g_nombre, aleatorio(15, 35), aleatorio(0.2, 1.5), aleatorio(12, 22));
-  enviarAlPuente(mesh, "suelo", json);
-
-  snprintf(json, sizeof(json),
-    "{\"finca\":\"%s\",\"dispositivo\":\"%s\",\"temp_aire\":%.1f,\"hr\":%.1f,\"temp_helada\":%.1f,"
-    "\"temp_cubierta\":%.1f,\"lluvia_mm\":0.0,\"hoja_mojada_min\":0,\"simulado\":true}",
-    FINCA, g_nombre, aleatorio(10, 28), aleatorio(40, 90), aleatorio(0, 10), aleatorio(10, 28));
-  enviarAlPuente(mesh, "atmosfera", json);
 }
 
 void enviarEstado()
@@ -69,7 +56,7 @@ void enviarEstado()
 void logPeriodico()
 {
   char extra[96];
-  snprintf(extra, sizeof(extra), "puente=%s nodos=%u enviados=%lu | luz %.0f lux (resto simulado)",
+  snprintf(extra, sizeof(extra), "puente=%s nodos=%u enviados=%lu | luz %.0f lux",
            g_puenteId ? "ok" : "NO", (unsigned)mesh.getNodeList().size(), (unsigned long)g_seq, ultimaLuz);
   logMemoria(extra);
 }
@@ -85,7 +72,6 @@ void setup()
   Serial.begin(115200);
   analogSetAttenuation(ADC_11db);   // rango completo 0-3,3 V en el pin del sensor de luz
   identificarPlaca();
-  Serial.printf("\nBaliza %s (%s) -> rol: NODO DE PRUEBA (luz real, resto simulado)\n", g_nombre, g_mac);
 
   mesh.setDebugMsgTypes(MESH_DEBUG);
   mesh.init(MESH_PREFIX, MESH_PASSWORD, &userScheduler, MESH_PORT, WIFI_AP_STA, MESH_CHANNEL);
