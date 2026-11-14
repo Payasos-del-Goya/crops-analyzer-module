@@ -1,29 +1,45 @@
 #pragma once
+// Cliente MQTT del puente. Sin String ni JSON dinámico: búferes fijos.
 
 WiFiClient espClient;
 PubSubClient mqttClient(espClient);
-unsigned long lastMqttAttempt = 0;
-String mqttClientId;
+static char mqttClientId[32];
+static unsigned long lastMqttAttempt = 0;
+static unsigned long ultimoMqttOk = 0;     // última vez que la conexión MQTT estaba viva
+
+// Contadores para el log
+static uint32_t nPublicados = 0, nFallos = 0, nDescartados = 0;
 
 void OnMqttReceived(char* topic, byte* payload, unsigned int length);
 
-void InitMqtt(uint32_t nodeId)
+void InitMqtt()
 {
-  mqttClientId = "baliza-puente-" + String(nodeId);
+  snprintf(mqttClientId, sizeof(mqttClientId), "baliza-puente-%s", g_nombre);
   mqttClient.setServer(MQTT_BROKER, MQTT_PORT);
   mqttClient.setBufferSize(512);
-  mqttClient.setKeepAlive(MQTT_KEEPALIVE);
+  mqttClient.setKeepAlive(MQTT_KEEPALIVE_S);
   mqttClient.setSocketTimeout(2);
   mqttClient.setCallback(OnMqttReceived);
-  Serial.println("mqtt iniciado");
+  ultimoMqttOk = millis();
 }
 
+// Un intento como mucho cada MQTT_RECONNECT_INTERVAL, para no bloquear la malla
+// Por serie solo se avisa de los cambios: conectado, perdido y el primer fallo de cada racha.
 void HandleMqtt(bool hasIp)
 {
+  static bool estabaConectado = false;
+  static bool falloAvisado = false;
+
   if (mqttClient.connected())
   {
     mqttClient.loop();
+    ultimoMqttOk = millis();
     return;
+  }
+  if (estabaConectado)
+  {
+    Serial.printf("MQTT: conexión perdida (rc=%d)\n", mqttClient.state());
+    estabaConectado = false;
   }
   if (!hasIp) return;
 
@@ -31,25 +47,39 @@ void HandleMqtt(bool hasIp)
   if (lastMqttAttempt != 0 && now - lastMqttAttempt < MQTT_RECONNECT_INTERVAL) return;
   lastMqttAttempt = now;
 
-  Serial.printf("MQTT: conectando a %s:%d como %s... ",
-                MQTT_BROKER.toString().c_str(), MQTT_PORT, mqttClientId.c_str());
-  if (mqttClient.connect(mqttClientId.c_str(), MQTT_USER, MQTT_PASSWORD))
+  if (mqttClient.connect(mqttClientId, MQTT_USER, MQTT_PASSWORD))
   {
-    Serial.println("conectado");
+    Serial.printf("MQTT: conectado como %s\n", mqttClientId);
     mqttClient.subscribe(MQTT_TOPIC_BROADCAST);
+    ultimoMqttOk = millis();
+    estabaConectado = true;
+    falloAvisado = false;
   }
-  else
+  else if (!falloAvisado)
   {
-    Serial.printf("fallo, rc=%d\n", mqttClient.state());
+    Serial.printf("MQTT: no conecta (rc=%d), se reintenta cada %lu s\n",
+                  mqttClient.state(), MQTT_RECONNECT_INTERVAL / 1000);
+    falloAvisado = true;
   }
 }
 
-void PublishReadings(uint32_t nodeId, const String& json)
+// Publica en fieldshift/c001/<dispositivo>/<tipo>. En "estado" añade "gateway" (el nombre del puente).
+void Publicar(const char* tipo, const char* dispositivo, const char* json, size_t len)
 {
-  if (!mqttClient.connected()) return;
-  String topic = String(MQTT_TOPIC_BASE) + "/" + String(nodeId) + "/lecturas";
-  if (!mqttClient.publish(topic.c_str(), json.c_str()))
+  static char topic[64];
+  static char payload[TAM_JSON + 40];
+
+  if (!mqttClient.connected()) { nDescartados++; return; }
+  snprintf(topic, sizeof(topic), "%s/%s/%s", MQTT_TOPIC_BASE, dispositivo, tipo);
+
+  const char* p = json;
+  if (strcmp(tipo, "estado") == 0)
   {
-    Serial.println("MQTT: publish fallido");
+    if (len < 2 || json[len - 1] != '}') { nDescartados++; return; }
+    int n = snprintf(payload, sizeof(payload), "%.*s,\"gateway\":\"%s\"}", (int)(len - 1), json, g_nombre);
+    if (n <= 0 || n >= (int)sizeof(payload)) { nDescartados++; return; }
+    p = payload;
   }
+  if (mqttClient.publish(topic, p)) nPublicados++;
+  else { nFallos++; Serial.printf("MQTT: publish fallido en %s\n", topic); }
 }

@@ -50,11 +50,16 @@ Un mensaje **por sonda y profundidad**. Si una baliza tiene sondas a 10 y 30 cm,
 | `finca`          | texto      | tag         |                                                               |
 | `zona`           | texto      | tag         |                                                               |
 | `dispositivo`    | texto      | tag         | `b01`, `b02`…                                                 |
-| `tipo`           | texto      | tag         | tipo de sonda: `capacitivo`, `tdr`… **`simulado` mientras no haya sensor** |
+| `tipo`           | texto      | tag         | tipo de sonda: `miflora`, `capacitivo`, `tdr`… **`simulado` si los valores son inventados** |
 | `profundidad_cm` | entero     | tag         | cm desde la superficie                                         |
-| `humedad_vol`    | decimal    | field       | % de humedad volumétrica (0–100)                               |
-| `conductividad`  | decimal    | field       | dS/m (conductividad eléctrica del suelo)                       |
-| `temperatura`    | decimal    | field       | °C                                                             |
+| `humedad_vol`    | decimal    | field       | % de humedad volumétrica (0–100). *Opcional*                   |
+| `conductividad`  | decimal    | field       | dS/m (conductividad eléctrica del suelo). *Opcional*           |
+| `temperatura`    | decimal    | field       | °C. *Opcional*                                                 |
+
+Los campos de medida son **opcionales**: cada sonda manda solo lo que mide, pero al menos uno.
+
+**MiFlora** (`tipo: "miflora"`, `profundidad_cm: 5`): `humedad_vol` = humedad del sensor (%),
+`conductividad` = valor del sensor en µS/cm **÷ 1000** (dS/m). No mide temperatura del suelo.
 
 ## 2. Atmósfera → `c001_campo` / `atmosfera`
 
@@ -73,7 +78,11 @@ Un mensaje **por sonda y profundidad**. Si una baliza tiene sondas a 10 y 30 cm,
 | `temp_cubierta`   | decimal | field       | °C, temperatura de la cubierta vegetal / hoja                      |
 | `lluvia_mm`       | decimal | field       | mm caídos **desde el mensaje anterior** (incremento, no acumulado) |
 | `hoja_mojada_min` | entero  | field       | minutos con la hoja mojada **desde el mensaje anterior**           |
+| `luz_lux`         | decimal | field       | lux, intensidad de luz. Debe ser lux de verdad (BH1750, MiFlora…); un valor en bruto de LDR no |
 | `simulado`        | bool    | tag         | `true` si los valores son inventados. Omitir con sensores reales   |
+
+Todos los campos de medida son **opcionales**: cada baliza manda solo lo que mide, pero al menos uno.
+El **MiFlora** manda `temp_aire` (su sensor de temperatura) y `luz_lux`.
 
 `lluvia_mm` y `hoja_mojada_min` van como incremento para que en Grafana se puedan sumar por
 hora o día sin que un reinicio de la placa estropee el total.
@@ -96,7 +105,10 @@ Datos reales de la propia placa (no dependen de sensores).
 | `rssi`        | entero  | field       | dBm. Puente: `WiFi.RSSI()` de la conexión a `fieldshift`. Baliza: RSSI del enlace de malla |
 | `snr`         | decimal | field       | dB. Solo aplica a LoRa: **omitir** con WiFi                                |
 | `seq`         | entero  | field       | contador de mensajes de esa baliza; vuelve a 0 al reiniciar               |
-| `sensores_ok` | entero  | field       | nº de sensores que han respondido bien en esta lectura (0 sin sensores)   |
+| `sensores_ok` | entero  | field       | nº de sensores con lectura reciente válida (0 sin sensores o si fallan)   |
+| `heap_libre`  | entero  | field       | bytes de memoria libre (`ESP.getFreeHeap()`). *Opcional*                  |
+| `heap_bloque` | entero  | field       | bytes del mayor bloque libre (`ESP.getMaxAllocHeap()`); si baja con el tiempo, la memoria se fragmenta. *Opcional* |
+| `uptime_s`    | entero  | field       | segundos desde que arrancó la placa (si vuelve a 0, se ha reiniciado). *Opcional* |
 | `gateway`     | texto   | field       | `dispositivo` del puente que lo publicó. **Lo rellena el puente**         |
 
 ## Hora de la lectura
@@ -126,13 +138,22 @@ activarlo, porque Telegraf tiene que pasar a leer ese campo.
 
 ## Firmware
 
-Hay dos sketches independientes. Abrir y cargar cada carpeta como un proyecto Arduino:
+Hay tres sketches independientes. Abrir y cargar cada carpeta como un proyecto Arduino
+(compilan con el núcleo ESP32 2.0.x y 3.x):
 
-- `puente/puente.ino`: único puente de la malla; conecta a `fieldshift` y publica los mensajes
-  recibidos por MQTT. No usa BLE ni sensores.
-- `nodo_miflora/nodo_miflora.ino`: nodo de la malla; lee el MiFlora configurado en `miflora.hpp`
-  y difunde sus lecturas por la malla.
+| Sketch | Placa | Qué hace |
+|---|---|---|
+| `puente/puente.ino` | `b01` (blanca) | Único puente: conecta a `fieldshift` y publica por MQTT lo que llega por la malla, más su propio estado |
+| `nodo_miflora/nodo_miflora.ino` | `b02` | Lee el MiFlora por BLE (`config.h`) y manda suelo, atmósfera y estado |
+| `nodo_sensor/nodo_sensor.ino` | `b03` | Nodo de prueba: **luz real** (sensor analógico, pin 34, `luz_lux` en un mensaje de atmósfera propio sin `simulado`); suelo y resto de atmósfera **simulados** (marcados); estado real |
 
-Cada sketch contiene sus propios headers (`config.h` y los headers específicos) para que Arduino
-IDE pueda compilarlo abriendo directamente esa carpeta, sin depender de archivos de su directorio
-padre.
+- `comun.h` es **el mismo archivo copiado en las tres carpetas** (malla, nombres de las placas,
+  watchdog, estado). Si se cambia, hay que copiarlo a las tres.
+- Mensajes dentro de la malla (texto, sin librería JSON): `<tipo>|<dispositivo>|<json>`. Los nodos
+  los envían **solo al puente** (`sendSingle`); el puente se anuncia cada 10 s con `P|<dispositivo>`.
+  El puente valida la cabecera y publica el JSON tal cual en `fieldshift/c001/<dispositivo>/<tipo>`.
+- Memoria: los mensajes se construyen con `snprintf` en búferes fijos (sin `String`/`JSONVar`
+  encadenados) para no fragmentar el heap; el cliente BLE del MiFlora se crea una sola vez.
+- Robustez: watchdog de 30 s en `loop()` en todas las placas; el puente se reinicia solo si pasa
+  90 s con IP pero sin MQTT, o 3 min sin IP. Cada placa imprime cada 10 s su memoria libre por serie.
+- Si una lectura del MiFlora falla, **no se envía** (nada de ceros) y el estado indica `sensores_ok: 0`.
