@@ -17,6 +17,7 @@
 
 #define VOLTAJE_SECO_MV    2500.0f
 #define VOLTAJE_MOJADO_MV  200.0f
+#define PROFUNDIDAD_FC28_CM 5   // AJUSTAR: cm a los que está clavado el FC-28
 
 DHT11 dht11(DHT_SENSOR_PIN);
 
@@ -46,6 +47,7 @@ static int leerHumedadTierra()
 {
   int analogValue = analogRead(HUMEDAD_SENSOR_PIN);
   int moisturePercentage = map(analogValue, VOLTAJE_SECO_MV, VOLTAJE_MOJADO_MV, 0, 100);
+  moisturePercentage = constrain(moisturePercentage, 0, 100);   // map() se sale si la lectura pasa de los límites
   return moisturePercentage;
 }
 
@@ -67,15 +69,15 @@ void enviarLecturas()
   ultimaLuz = leerLuz();
   ultimaHumedadAire = leerHumedadAire();
   snprintf(json, sizeof(json),
-    "{\"finca\":\"%s\",\"dispositivo\":\"%s\",\"temp_aire\":%d,\"luz_lux\":%d,\"hum_aire\":%d}",
+    "{\"finca\":\"%s\",\"dispositivo\":\"%s\",\"temp_aire\":%d,\"luz_lux\":%d,\"hr\":%d}",
     FINCA, g_nombre, ultimaTemperatura, ultimaLuz, ultimaHumedadAire);
   Serial.println(json);
   enviarAlPuente(mesh, "atmosfera", json);
 
   ultimaHumedad = leerHumedadTierra();
   snprintf(json, sizeof(json),
-    "{\"finca\":\"%s\",\"dispositivo\":\"%s\",\"humedad_vol\":%d}",
-    FINCA, g_nombre, ultimaHumedad);
+    "{\"finca\":\"%s\",\"zona\":\"%s\",\"dispositivo\":\"%s\",\"tipo\":\"fc28\",\"profundidad_cm\":%d,\"humedad_vol\":%d}",
+    FINCA, ZONA, g_nombre, PROFUNDIDAD_FC28_CM, ultimaHumedad);
   enviarAlPuente(mesh, "suelo", json);
 
 }
