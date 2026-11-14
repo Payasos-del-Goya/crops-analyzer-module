@@ -42,7 +42,7 @@ Un mensaje **por sonda y profundidad**. Si una baliza tiene sondas a 10 y 30 cm,
 
 ```json
 {"finca":"demo","zona":"A","dispositivo":"b02","tipo":"simulado","profundidad_cm":20,
- "humedad_vol":23.4,"conductividad":0.85,"temperatura":15.2}
+ "humedad_vol":23.4,"conductividad":850,"temperatura":15.2}
 ```
 
 | Clave            | Tipo       | En InfluxDB | Unidad / valores                                              |
@@ -53,13 +53,13 @@ Un mensaje **por sonda y profundidad**. Si una baliza tiene sondas a 10 y 30 cm,
 | `tipo`           | texto      | tag         | tipo de sonda: `miflora`, `capacitivo`, `tdr`… **`simulado` si los valores son inventados** |
 | `profundidad_cm` | entero     | tag         | cm desde la superficie                                         |
 | `humedad_vol`    | decimal    | field       | % de humedad volumétrica (0–100). *Opcional*                   |
-| `conductividad`  | decimal    | field       | dS/m (conductividad eléctrica del suelo). *Opcional*           |
+| `conductividad`  | decimal    | field       | µS/cm (conductividad eléctrica del suelo). *Opcional*          |
 | `temperatura`    | decimal    | field       | °C. *Opcional*                                                 |
 
 Los campos de medida son **opcionales**: cada sonda manda solo lo que mide, pero al menos uno.
 
 **MiFlora** (`tipo: "miflora"`, `profundidad_cm: 5`): `humedad_vol` = humedad del sensor (%),
-`conductividad` = valor del sensor en µS/cm **÷ 1000** (dS/m). No mide temperatura del suelo.
+`conductividad` = valor del sensor en µS/cm, tal cual. No mide temperatura del suelo.
 
 ## 2. Atmósfera → `c001_campo` / `atmosfera`
 
