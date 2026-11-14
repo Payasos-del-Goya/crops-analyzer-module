@@ -11,6 +11,8 @@
 #define LIGHT_SENSOR_PIN 34
 #define LUX_POR_CUENTA   (286 / 1150.0f)   // calibración aproximada (lineal) del sensor
 
+#define HUMEDAD_SENSOR_PIN 35
+
 Scheduler userScheduler;
 painlessMesh mesh;
 
@@ -22,11 +24,18 @@ Task tEstado(PERIODO_ESTADO_MS, TASK_FOREVER, &enviarEstado);
 Task tLog(PERIODO_LOG_MS, TASK_FOREVER, &logPeriodico);
 
 static float ultimaLuz = -1;
+static float ultimaHumedad = -1;
 
 static float leerLuz()
 {
   int analogValue = analogRead(LIGHT_SENSOR_PIN);
   return analogValue * LUX_POR_CUENTA;
+}
+
+static float leerHumedadTierra()
+{
+  int analogValue = analogRead(HUMEDAD_SENSOR_PIN);
+  return analogValue;
 }
 
 static float aleatorio(float minimo, float maximo)   // random() usa el generador hardware del ESP32
@@ -44,6 +53,12 @@ void enviarLecturas()
     FINCA, g_nombre, ultimaLuz);
   enviarAlPuente(mesh, "atmosfera", json);
 
+  ultimaHumedad = leerHumedadTierra();
+  snprintf(json, sizeof(json),
+    "{\"finca\":\"%s\",\"dispositivo\":\"%s\",\"humedad_vol\":%d}",
+    FINCA, g_nombre, ultimaHumedad);
+  enviarAlPuente(mesh, "suelo", json);
+
 }
 
 void enviarEstado()
@@ -56,8 +71,8 @@ void enviarEstado()
 void logPeriodico()
 {
   char extra[96];
-  snprintf(extra, sizeof(extra), "puente=%s nodos=%u enviados=%lu | luz %.0f lux",
-           g_puenteId ? "ok" : "NO", (unsigned)mesh.getNodeList().size(), (unsigned long)g_seq, ultimaLuz);
+  snprintf(extra, sizeof(extra), "puente=%s nodos=%u enviados=%lu | luz %.0f lux | humedad %d",
+           g_puenteId ? "ok" : "NO", (unsigned)mesh.getNodeList().size(), (unsigned long)g_seq, ultimaLuz, ultimaHumedad);
   logMemoria(extra);
 }
 
