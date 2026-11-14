@@ -1,5 +1,5 @@
 // Nodo con sensor Xiaomi MiFlora (datos REALES). Formato: FORMATO_DATOS.md
-//   suelo:     humedad_vol (%), conductividad (dS/m = µS/cm / 1000), tipo "miflora"
+//   suelo:     humedad_vol (%), conductividad µS/cm, tipo "miflora"
 //   atmósfera: temp_aire (°C), luz_lux
 //   estado:    sensores_ok = 1 si hay una lectura reciente del MiFlora, 0 si no
 #include "painlessMesh.h"
@@ -75,8 +75,8 @@ void enviarLecturas()
 
   snprintf(json, sizeof(json),
     "{\"finca\":\"%s\",\"zona\":\"%s\",\"dispositivo\":\"%s\",\"tipo\":\"miflora\",\"profundidad_cm\":%d,"
-    "\"humedad_vol\":%u,\"conductividad\":%.3f}",
-    FINCA, ZONA, g_nombre, MIFLORA_PROFUNDIDAD_CM, l.humedad, l.conductividad / 1000.0f);
+    "\"humedad_vol\":%u,\"conductividad\":%d}",
+    FINCA, ZONA, g_nombre, MIFLORA_PROFUNDIDAD_CM, l.humedad, l.conductividad);
   enviarAlPuente(mesh, "suelo", json);
 
   snprintf(json, sizeof(json),
