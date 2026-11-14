@@ -145,7 +145,7 @@ Hay tres sketches independientes. Abrir y cargar cada carpeta como un proyecto A
 |---|---|---|
 | `puente/puente.ino` | `b01` (blanca) | Único puente: conecta a `fieldshift` y publica por MQTT lo que llega por la malla, más su propio estado |
 | `nodo_miflora/nodo_miflora.ino` | `b02` | Lee el MiFlora por BLE (`config.h`) y manda suelo, atmósfera y estado |
-| `nodo_sensor/nodo_sensor.ino` | `b03` | Nodo de prueba: suelo y atmósfera **simulados** (marcados) y estado real |
+| `nodo_sensor/nodo_sensor.ino` | `b03` | Nodo de prueba: **luz real** (sensor analógico, pin 34, `luz_lux` en un mensaje de atmósfera propio sin `simulado`); suelo y resto de atmósfera **simulados** (marcados); estado real |
 
 - `comun.h` es **el mismo archivo copiado en las tres carpetas** (malla, nombres de las placas,
   watchdog, estado). Si se cambia, hay que copiarlo a las tres.
