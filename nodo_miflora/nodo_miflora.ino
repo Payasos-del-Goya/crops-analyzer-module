@@ -1,89 +1,121 @@
+// Nodo con sensor Xiaomi MiFlora (datos REALES). Formato: FORMATO_DATOS.md
+//   suelo:     humedad_vol (%), conductividad (dS/m = µS/cm / 1000), tipo "miflora"
+//   atmósfera: temp_aire (°C), luz_lux
+//   estado:    sensores_ok = 1 si hay una lectura reciente del MiFlora, 0 si no
 #include "painlessMesh.h"
-#include <Arduino_JSON.h>
+#include <WiFi.h>
 
+#include "comun.h"
 #include "config.h"
 #include "miflora.hpp"
 
 Scheduler userScheduler;
 painlessMesh mesh;
-uint32_t seq = 0;
-datosMiflora latestData = {0.0f, 0, 0, 0};
-portMUX_TYPE sensorMux = portMUX_INITIALIZER_UNLOCKED;
 
-void sendMessage();
-Task taskSendMessage(TASK_SECOND * 5, TASK_FOREVER, &sendMessage);
+// Última lectura válida (la escribe la tarea del sensor, la lee loop())
+static LecturaMiFlora ultima;
+static unsigned long ultimaMs = 0;     // 0 = nunca ha habido lectura válida
+static portMUX_TYPE muxSensor = portMUX_INITIALIZER_UNLOCKED;
 
-void sensorTask(void *parameter)
+void enviarLecturas();
+void enviarEstado();
+void logPeriodico();
+Task tLecturas(PERIODO_LECTURAS_MS, TASK_FOREVER, &enviarLecturas);
+Task tEstado(PERIODO_ESTADO_MS, TASK_FOREVER, &enviarEstado);
+Task tLog(PERIODO_LOG_MS, TASK_FOREVER, &logPeriodico);
+
+// Tarea aparte (núcleo 0): la conexión BLE tarda segundos y no debe bloquear la malla
+void tareaSensor(void*)
 {
-  vTaskDelay(pdMS_TO_TICKS(10000));
-  while (true)
+  vTaskDelay(pdMS_TO_TICKS(10000));   // dejar que la malla arranque primero
+  for (;;)
   {
-    datosMiflora newData = leerSensor();
-    portENTER_CRITICAL(&sensorMux);
-    latestData = newData;
-    portEXIT_CRITICAL(&sensorMux);
-    vTaskDelay(pdMS_TO_TICKS(30000));
+    LecturaMiFlora l;
+    if (leerMiFlora(l))
+    {
+      portENTER_CRITICAL(&muxSensor);
+      ultima = l;
+      ultimaMs = millis();
+      portEXIT_CRITICAL(&muxSensor);
+    }
+    vTaskDelay(pdMS_TO_TICKS(MIFLORA_PERIODO_MS));
   }
 }
 
-String getReadings()
+// Devuelve true si hay una lectura reciente y la copia en l
+static bool lecturaReciente(LecturaMiFlora& l)
 {
-  datosMiflora datos;
-  portENTER_CRITICAL(&sensorMux);
-  datos = latestData;
-  portEXIT_CRITICAL(&sensorMux);
-  JSONVar reading;
-  reading["node"] = String(mesh.getNodeId());
-  reading["seq"] = (double)seq++;
-  reading["temp_aire"] = datos.tempAire;
-  reading["hr"] = datos.hr;
-  reading["conductividad"] = datos.conductividad;
-  reading["luz_lux"] = datos.luz_lux;
-  reading["simulado"] = false;
-  return JSON.stringify(reading);
+  portENTER_CRITICAL(&muxSensor);
+  l = ultima;
+  unsigned long t = ultimaMs;
+  portEXIT_CRITICAL(&muxSensor);
+  return t != 0 && millis() - t <= MIFLORA_MAX_EDAD_MS;
 }
 
-void sendMessage()
+void enviarLecturas()
 {
-  String message = getReadings();
-  Serial.println("Envio: " + message);
-  mesh.sendBroadcast(message);
-  taskSendMessage.setInterval(random(TASK_SECOND * 3, TASK_SECOND * 7));
+  LecturaMiFlora l;
+  if (!lecturaReciente(l))
+  {
+    Serial.println("Sin lectura reciente del MiFlora: no se envían datos de campo");
+    return;
+  }
+  char json[TAM_JSON];
+
+  snprintf(json, sizeof(json),
+    "{\"finca\":\"%s\",\"zona\":\"%s\",\"dispositivo\":\"%s\",\"tipo\":\"miflora\",\"profundidad_cm\":%d,"
+    "\"humedad_vol\":%u,\"conductividad\":%.3f}",
+    FINCA, ZONA, g_nombre, MIFLORA_PROFUNDIDAD_CM, l.humedad, l.conductividad / 1000.0f);
+  enviarAlPuente(mesh, "suelo", json);
+
+  snprintf(json, sizeof(json),
+    "{\"finca\":\"%s\",\"dispositivo\":\"%s\",\"temp_aire\":%.1f,\"luz_lux\":%lu}",
+    FINCA, g_nombre, l.temperatura, (unsigned long)l.luz_lux);
+  enviarAlPuente(mesh, "atmosfera", json);
 }
 
-void receivedCallback(uint32_t from, String &msg)
+void enviarEstado()
 {
+  LecturaMiFlora l;
+  char json[TAM_JSON];
+  int n = jsonEstado(json, sizeof(json), "baliza", WiFi.RSSI(), lecturaReciente(l) ? 1 : 0);
+  if (n > 0 && n < (int)sizeof(json)) enviarAlPuente(mesh, "estado", json);
+}
+
+void logPeriodico()
+{
+  char extra[64];
+  snprintf(extra, sizeof(extra), "puente=%u nodos=%u", g_puenteId, (unsigned)mesh.getNodeList().size());
+  logMemoria(extra);
+}
+
+void receivedCallback(uint32_t from, String& msg)
+{
+  if (procesarAnuncioPuente(from, msg)) return;
   Serial.printf("Malla: de %u: %s\n", from, msg.c_str());
-}
-
-void newConnectionCallback(uint32_t nodeId)
-{
-  Serial.printf("Malla: nueva conexión, nodeId = %u\n", nodeId);
-}
-
-void changedConnectionCallback()
-{
-  Serial.printf("Malla: conexiones cambiadas, nodos = %u\n", mesh.getNodeList().size());
 }
 
 void setup()
 {
   Serial.begin(115200);
-  Serial.printf("\nBaliza -> rol: NODO MIFLORA, nodeId = %u\n", mesh.getNodeId());
+  identificarPlaca();
+  Serial.printf("\nBaliza %s (%s) -> rol: NODO MIFLORA (%s)\n", g_nombre, g_mac, MIFLORA_MAC);
 
   mesh.setDebugMsgTypes(ERROR | STARTUP | CONNECTION);
   mesh.init(MESH_PREFIX, MESH_PASSWORD, &userScheduler, MESH_PORT, WIFI_AP_STA, MESH_CHANNEL);
   mesh.setContainsRoot(true);
   mesh.onReceive(&receivedCallback);
-  mesh.onNewConnection(&newConnectionCallback);
-  mesh.onChangedConnections(&changedConnectionCallback);
 
-  userScheduler.addTask(taskSendMessage);
-  taskSendMessage.enable();
-  xTaskCreatePinnedToCore(sensorTask, "MiFlora", 8192, nullptr, 1, nullptr, 0);
+  userScheduler.addTask(tLecturas); tLecturas.enableDelayed(20000);
+  userScheduler.addTask(tEstado);   tEstado.enableDelayed(15000);
+  userScheduler.addTask(tLog);      tLog.enable();
+
+  xTaskCreatePinnedToCore(tareaSensor, "MiFlora", 8192, nullptr, 1, nullptr, 0);
+  iniciarWatchdog();
 }
 
 void loop()
 {
+  esp_task_wdt_reset();
   mesh.update();
 }
