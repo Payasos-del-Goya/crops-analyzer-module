@@ -1,3 +1,4 @@
-nodo_sensor: amarillo
-nodo_miflora: azul
-puente: rojo
+- nodo_sensor: amarillo
+- nodo_miflora: azul
+- puente: rojo
+- invent: naranja
