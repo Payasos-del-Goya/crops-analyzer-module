@@ -123,3 +123,16 @@ activarlo, porque Telegraf tiene que pasar a leer ese campo.
   quedarían en columnas distintas.
 - Los datos simulados van **siempre** marcados (`tipo: "simulado"` en suelo, `simulado: true` en
   atmósfera) para poder filtrarlos o borrarlos cuando haya sensores reales.
+
+## Firmware
+
+Hay dos sketches independientes. Abrir y cargar cada carpeta como un proyecto Arduino:
+
+- `puente/puente.ino`: único puente de la malla; conecta a `fieldshift` y publica los mensajes
+  recibidos por MQTT. No usa BLE ni sensores.
+- `nodo_miflora/nodo_miflora.ino`: nodo de la malla; lee el MiFlora configurado en `miflora.hpp`
+  y difunde sus lecturas por la malla.
+
+Cada sketch contiene sus propios headers (`config.h` y los headers específicos) para que Arduino
+IDE pueda compilarlo abriendo directamente esa carpeta, sin depender de archivos de su directorio
+padre.

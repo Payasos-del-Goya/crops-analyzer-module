@@ -1,0 +1,3 @@
+nodo_sensor: amarillo
+nodo_miflora: azul
+puente: rojo

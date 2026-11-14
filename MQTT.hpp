@@ -12,6 +12,7 @@ void InitMqtt(uint32_t nodeId)
 {
   mqttClientId = "baliza-puente-" + String(nodeId);   // único por placa
   mqttClient.setServer(MQTT_BROKER, MQTT_PORT);
+  mqttClient.setBufferSize(512);
   mqttClient.setKeepAlive(MQTT_KEEPALIVE);
   mqttClient.setSocketTimeout(2);
   mqttClient.setCallback(OnMqttReceived);

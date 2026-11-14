@@ -1,7 +1,6 @@
 #pragma once
-// Configuración de la baliza. El MISMO firmware se graba en todas las placas:
-// la que tenga la MAC BRIDGE_MAC hace de puente malla <-> WiFi fieldshift <-> MQTT,
-// el resto son nodos normales de la malla.
+// Configuración compartida por los dos sketches:
+// puente/puente.ino y nodo_miflora/nodo_miflora.ino.
 
 // ---- Malla painlessMesh (idéntico en todas las placas) ----
 #define MESH_PREFIX     "MyMeshNetwork"
@@ -10,10 +9,6 @@
 // Canal WiFi: la malla y la WiFi de la Raspberry Pi (fieldshift) DEBEN estar en el mismo,
 // porque el puente usa una sola radio para las dos redes.
 #define MESH_CHANNEL    1
-
-// ---- Nodo puente ----
-// MAC (la que imprime esptool / la de la pegatina) de la placa que hace de puente.
-#define BRIDGE_MAC      "E4:65:B8:54:34:D4"
 
 // WiFi de la Raspberry Pi
 #define STATION_SSID     "fieldshift"
