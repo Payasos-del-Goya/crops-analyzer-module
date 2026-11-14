@@ -1,4 +1,4 @@
-// Nodo de prueba (b03). Formato: FORMATO_DATOS.md
+// Nodo de prueba. Formato: FORMATO_DATOS.md
 //   - Luz: sensor analógico REAL en el pin 34 -> atmósfera, mensaje propio SIN "simulado"
 //   - Suelo y el resto de la atmósfera: SIMULADOS (marcados), hasta que haya sensores
 //   - Estado real (RSSI, memoria...), sensores_ok = 1 (el de luz)

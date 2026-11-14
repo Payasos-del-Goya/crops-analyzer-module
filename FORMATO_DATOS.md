@@ -24,15 +24,10 @@ cambiarlo, porque hay que tocar también la configuración de Telegraf.
 
 ## Nombres de los dispositivos
 
-Cada placa tiene un nombre corto fijo, configurado en `config.h` según su MAC, en lugar del nodeId
-de painlessMesh (que es un número largo e ilegible):
-
-| MAC                 | `dispositivo` | Notas                       |
-|---------------------|---------------|-----------------------------|
-| `E4:65:B8:54:34:D4` | `b01`         | ESP32 blanca, **puente**    |
-| `E0:5A:1B:A7:8B:10` | `b02`         |                             |
-| `E0:5A:1B:A6:FD:A8` | `b03`         |                             |
-| `E0:5A:1B:A7:F8:F9` | `b04`         | MAC deducida del nodeId; comprobadla |
+Cada placa usa un identificador estable derivado de los 3 últimos bytes de su MAC, en lugar del
+`nodeId` de painlessMesh (que es un número largo e ilegible). El formato es `bXXXXXX`, por
+ejemplo, una MAC terminada en `A7:F8:F9` genera el dispositivo `bA7F8F9`. No hay que registrar
+la MAC en una tabla al añadir una baliza.
 
 Valores comunes para la demo: `finca = "demo"`, `zona = "A"`.
 
@@ -41,7 +36,7 @@ Valores comunes para la demo: `finca = "demo"`, `zona = "A"`.
 Un mensaje **por sonda y profundidad**. Si una baliza tiene sondas a 10 y 30 cm, manda dos mensajes.
 
 ```json
-{"finca":"demo","zona":"A","dispositivo":"b02","tipo":"simulado","profundidad_cm":20,
+{"finca":"demo","zona":"A","dispositivo":"bA7F8F9","tipo":"simulado","profundidad_cm":20,
  "humedad_vol":23.4,"conductividad":850,"temperatura":15.2}
 ```
 
@@ -49,7 +44,7 @@ Un mensaje **por sonda y profundidad**. Si una baliza tiene sondas a 10 y 30 cm,
 |------------------|------------|-------------|---------------------------------------------------------------|
 | `finca`          | texto      | tag         |                                                               |
 | `zona`           | texto      | tag         |                                                               |
-| `dispositivo`    | texto      | tag         | `b01`, `b02`…                                                 |
+| `dispositivo`    | texto      | tag         | `bXXXXXX` (derivado de los 3 últimos bytes de la MAC)          |
 | `tipo`           | texto      | tag         | tipo de sonda: `miflora`, `capacitivo`, `tdr`… **`simulado` si los valores son inventados** |
 | `profundidad_cm` | entero     | tag         | cm desde la superficie                                         |
 | `humedad_vol`    | decimal    | field       | % de humedad volumétrica (0–100). *Opcional*                   |
@@ -64,7 +59,7 @@ Los campos de medida son **opcionales**: cada sonda manda solo lo que mide, pero
 ## 2. Atmósfera → `c001_campo` / `atmosfera`
 
 ```json
-{"finca":"demo","dispositivo":"b01","temp_aire":18.6,"hr":64.0,"temp_helada":2.1,
+{"finca":"demo","dispositivo":"bA7F8F9","temp_aire":18.6,"hr":64.0,"temp_helada":2.1,
  "temp_cubierta":17.9,"lluvia_mm":0.2,"hoja_mojada_min":5,"simulado":true}
 ```
 
@@ -92,8 +87,8 @@ hora o día sin que un reinicio de la placa estropee el total.
 Datos reales de la propia placa (no dependen de sensores).
 
 ```json
-{"finca":"demo","dispositivo":"b02","tipo":"baliza","bateria_v":3.92,"rssi":-61,"seq":152,
- "sensores_ok":0,"gateway":"b01"}
+{"finca":"demo","dispositivo":"bA7F8F9","tipo":"baliza","bateria_v":3.92,"rssi":-61,"seq":152,
+ "sensores_ok":0,"gateway":"bA7F8F9"}
 ```
 
 | Clave         | Tipo    | En InfluxDB | Unidad / significado                                                      |
@@ -143,9 +138,9 @@ Hay tres sketches independientes. Abrir y cargar cada carpeta como un proyecto A
 
 | Sketch | Placa | Qué hace |
 |---|---|---|
-| `puente/puente.ino` | `b01` (blanca) | Único puente: conecta a `fieldshift` y publica por MQTT lo que llega por la malla, más su propio estado |
-| `nodo_miflora/nodo_miflora.ino` | `b02` | Lee el MiFlora por BLE (`config.h`) y manda suelo, atmósfera y estado |
-| `nodo_sensor/nodo_sensor.ino` | `b03` | Nodo de prueba: **luz real** (sensor analógico, pin 34, `luz_lux` en un mensaje de atmósfera propio sin `simulado`); suelo y resto de atmósfera **simulados** (marcados); estado real |
+| `puente/puente.ino` | ID derivado de su MAC | Único puente: conecta a `fieldshift` y publica por MQTT lo que llega por la malla, más su propio estado |
+| `nodo_miflora/nodo_miflora.ino` | ID derivado de su MAC | Lee el MiFlora por BLE (`config.h`) y manda suelo, atmósfera y estado |
+| `nodo_sensor/nodo_sensor.ino` | ID derivado de su MAC | Nodo de prueba: **luz real** (sensor analógico, pin 34, `luz_lux` en un mensaje de atmósfera propio sin `simulado`); suelo y resto de atmósfera **simulados** (marcados); estado real |
 
 - `comun.h` es **el mismo archivo copiado en las tres carpetas** (malla, nombres de las placas,
   watchdog, estado). Si se cambia, hay que copiarlo a las tres.

@@ -27,15 +27,6 @@
 #define WDT_TIMEOUT_S            30        // si loop() se atasca 30 s, la placa se reinicia
 #define MAX_SIN_PUENTE_MS        180000UL  // nodo: si no oye al puente en 3 min (18 anuncios), se reinicia
 
-// Nombre corto de cada placa según su MAC (se usa como "dispositivo" en la base de datos)
-struct Dispositivo { const char* mac; const char* nombre; };
-static const Dispositivo DISPOSITIVOS[] = {
-  {"E4:65:B8:54:34:D4", "b01"},   // ESP32 blanca: puente
-  {"E0:5A:1B:A7:8B:10", "b02"},   // nodo MiFlora
-  {"E0:5A:1B:A6:FD:A8", "b03"},   // nodo de prueba (datos simulados)
-  {"E0:5A:1B:A7:F8:F9", "b04"},
-};
-
 // Mensajes por la malla (texto plano, sin librería JSON):
 //   lecturas/estado:   "<tipo>|<dispositivo>|<json>"   tipo = suelo | atmosfera | estado
 //   anuncio del puente: "P|<dispositivo>"
@@ -45,22 +36,15 @@ static char g_mac[18];
 static char g_nombre[8];
 static uint32_t g_seq = 0;      // mensajes enviados por esta placa desde que arrancó
 
-// Rellena g_mac y g_nombre. Una placa que no esté en la tabla se llama "x" + 3 últimos bytes de la MAC.
+// Rellena g_mac y g_nombre. El ID se deriva de los 3 últimos bytes de la MAC
+// para que sea estable y no haya que registrar cada placa en una tabla.
 inline void identificarPlaca()
 {
   uint64_t mac = ESP.getEfuseMac();   // byte 0 de la MAC en los bits bajos
   snprintf(g_mac, sizeof(g_mac), "%02X:%02X:%02X:%02X:%02X:%02X",
            (uint8_t)(mac), (uint8_t)(mac >> 8), (uint8_t)(mac >> 16),
            (uint8_t)(mac >> 24), (uint8_t)(mac >> 32), (uint8_t)(mac >> 40));
-  for (const auto& d : DISPOSITIVOS)
-  {
-    if (strcasecmp(d.mac, g_mac) == 0)
-    {
-      strlcpy(g_nombre, d.nombre, sizeof(g_nombre));
-      return;
-    }
-  }
-  snprintf(g_nombre, sizeof(g_nombre), "x%02X%02X%02X",
+  snprintf(g_nombre, sizeof(g_nombre), "b%02X%02X%02X",
            (uint8_t)(mac >> 24), (uint8_t)(mac >> 32), (uint8_t)(mac >> 40));
 }
 
