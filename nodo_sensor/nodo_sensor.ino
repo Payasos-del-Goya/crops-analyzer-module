@@ -3,12 +3,20 @@
 
 #include "config.h"
 
+#define LIGHT_SENSOR_PIN 34
+
 Scheduler userScheduler;
 painlessMesh mesh;
 uint32_t seq = 0;
 
 void sendMessage();
 Task taskSendMessage(TASK_SECOND * 5, TASK_FOREVER, &sendMessage);
+
+int readLight() {
+  int analogValue = analogRead(LIGHT_SENSOR_PIN);
+  float lux = analogValue * (286 / 1150.0);
+  return lux;
+}
 
 String getReadings()
 {
@@ -18,7 +26,7 @@ String getReadings()
   reading["temp_aire"] = 1;
   reading["hr"] = 2;
   reading["conductividad"] = 3;
-  reading["luz_lux"] = 4;
+  reading["luz_lux"] = readLight();
   reading["simulado"] = true;
   return JSON.stringify(reading);
 }
@@ -49,6 +57,9 @@ void changedConnectionCallback()
 void setup()
 {
   Serial.begin(115200);
+
+  analogSetAttenuation(ADC_11db);
+
   Serial.printf("\nBaliza -> rol: NODO, nodeId = %u\n", mesh.getNodeId());
 
   mesh.setDebugMsgTypes(ERROR | STARTUP | CONNECTION);
