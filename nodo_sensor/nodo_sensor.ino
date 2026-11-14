@@ -4,14 +4,21 @@
 //   - Estado real (RSSI, memoria...), sensores_ok = 1 (el de luz)
 #include "painlessMesh.h"
 #include <WiFi.h>
+#include <DHT11.h>
 
 #include "comun.h"
 
 // Sensor de luz analógico. Pin 34 = ADC1: funciona con la WiFi activa (el ADC2 no).
 #define LIGHT_SENSOR_PIN 34
+#define DHT_SENSOR_PIN 21
 #define LUX_POR_CUENTA   (286 / 1150.0f)   // calibración aproximada (lineal) del sensor
 
 #define HUMEDAD_SENSOR_PIN 35
+
+#define VOLTAJE_SECO_MV    2500.0f
+#define VOLTAJE_MOJADO_MV  200.0f
+
+DHT11 dht11(DHT_SENSOR_PIN);
 
 Scheduler userScheduler;
 painlessMesh mesh;
@@ -23,34 +30,46 @@ Task tLecturas(PERIODO_LECTURAS_MS, TASK_FOREVER, &enviarLecturas);
 Task tEstado(PERIODO_ESTADO_MS, TASK_FOREVER, &enviarEstado);
 Task tLog(PERIODO_LOG_MS, TASK_FOREVER, &logPeriodico);
 
-static float ultimaLuz = -1;
-static float ultimaHumedad = -1;
+static int ultimaLuz = -1;
+static int ultimaHumedad = -1;
+static int ultimaTemperatura = -1;
+static int ultimaHumedadAire = -1;
 
-static float leerLuz()
+
+static int leerLuz()
 {
   int analogValue = analogRead(LIGHT_SENSOR_PIN);
   return analogValue * LUX_POR_CUENTA;
 }
 
-static float leerHumedadTierra()
+static int leerHumedadTierra()
 {
   int analogValue = analogRead(HUMEDAD_SENSOR_PIN);
-  return analogValue;
+  int moisturePercentage = map(analogValue, VOLTAJE_SECO_MV, VOLTAJE_MOJADO_MV, 0, 100);
+  return moisturePercentage;
 }
 
-static float aleatorio(float minimo, float maximo)   // random() usa el generador hardware del ESP32
+static int leerHumedadAire()
 {
-  return minimo + (maximo - minimo) * (random(0, 10001) / 10000.0f);
+  return dht11.readHumidity();
+}
+
+static int leerTemperatura()
+{
+  return dht11.readTemperature();
 }
 
 void enviarLecturas()
 {
   char json[TAM_JSON];
 
+  ultimaTemperatura = leerTemperatura();
   ultimaLuz = leerLuz();
+  ultimaHumedadAire = leerHumedadAire();
   snprintf(json, sizeof(json),
-    "{\"finca\":\"%s\",\"dispositivo\":\"%s\",\"luz_lux\":%.0f}",
-    FINCA, g_nombre, ultimaLuz);
+    "{\"finca\":\"%s\",\"dispositivo\":\"%s\",\"temp_aire\":%d,\"luz_lux\":%d,\"hum_aire\":%d}",
+    FINCA, g_nombre, ultimaTemperatura, ultimaLuz, ultimaHumedadAire);
+  Serial.println(json);
   enviarAlPuente(mesh, "atmosfera", json);
 
   ultimaHumedad = leerHumedadTierra();
@@ -71,8 +90,8 @@ void enviarEstado()
 void logPeriodico()
 {
   char extra[96];
-  snprintf(extra, sizeof(extra), "puente=%s nodos=%u enviados=%lu | luz %.0f lux | humedad %d",
-           g_puenteId ? "ok" : "NO", (unsigned)mesh.getNodeList().size(), (unsigned long)g_seq, ultimaLuz, ultimaHumedad);
+  snprintf(extra, sizeof(extra), "puente=%s nodos=%u enviados=%lu | luz %d lux | humedad tierra %d | humedad aire %d | temperatura aire %d",
+           g_puenteId ? "ok" : "NO", (unsigned)mesh.getNodeList().size(), (unsigned long)g_seq, ultimaLuz, ultimaHumedad, ultimaHumedadAire, ultimaTemperatura);
   logMemoria(extra);
 }
 
