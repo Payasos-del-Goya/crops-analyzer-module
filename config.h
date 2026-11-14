@@ -13,7 +13,7 @@
 
 // ---- Nodo puente ----
 // MAC (la que imprime esptool / la de la pegatina) de la placa que hace de puente.
-#define BRIDGE_MAC      "E0:5A:1B:A7:8B:10"
+#define BRIDGE_MAC      "E4:65:B8:54:34:D4"
 
 // WiFi de la Raspberry Pi
 #define STATION_SSID     "fieldshift"
