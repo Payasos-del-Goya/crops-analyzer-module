@@ -22,7 +22,8 @@
 #define PERIODO_LECTURAS_MS      30000UL   // suelo + atmósfera
 #define PERIODO_ESTADO_MS        60000UL   // estado de la placa
 #define PERIODO_ANUNCIO_MS       10000UL   // el puente anuncia quién es
-#define PERIODO_LOG_MS           10000UL   // línea de memoria por el puerto serie
+#define PERIODO_LOG_MS           60000UL   // una línea de resumen por el puerto serie
+#define MESH_DEBUG               ERROR     // painlessMesh: solo errores (STARTUP|CONNECTION para depurar la malla)
 #define WDT_TIMEOUT_S            30        // si loop() se atasca 30 s, la placa se reinicia
 
 // Nombre corto de cada placa según su MAC (se usa como "dispositivo" en la base de datos)
@@ -88,10 +89,10 @@ inline int jsonEstado(char* buf, size_t n, const char* tipo, int rssi, int senso
     (unsigned long)(millis() / 1000));
 }
 
-// Línea periódica por el puerto serie para vigilar la memoria
+// Línea de resumen periódica por el puerto serie (memoria + lo que añada cada sketch)
 inline void logMemoria(const char* extra)
 {
-  Serial.printf("[%lus] %s heap libre=%u min=%u bloque=%u %s\n",
+  Serial.printf("[%lus] %s heap=%u min=%u bloque=%u | %s\n",
                 (unsigned long)(millis() / 1000), g_nombre,
                 ESP.getFreeHeap(), ESP.getMinFreeHeap(), ESP.getMaxAllocHeap(), extra);
 }
@@ -103,7 +104,7 @@ static uint32_t g_puenteId = 0;        // nodeId del puente (lo aprendemos de su
 inline bool procesarAnuncioPuente(uint32_t from, const String& msg)
 {
   if (!msg.startsWith("P|")) return false;
-  if (g_puenteId != from) Serial.printf("Puente: %s (nodeId %u)\n", msg.c_str() + 2, from);
+  if (g_puenteId != from) Serial.printf("Puente encontrado: %s\n", msg.c_str() + 2);
   g_puenteId = from;
   return true;
 }

@@ -2,6 +2,7 @@
 // Lectura del sensor Xiaomi MiFlora por Bluetooth LE.
 // - El cliente BLE se crea UNA vez y se reutiliza (crearlo/borrarlo en cada lectura pierde memoria).
 // - Compatible con el núcleo ESP32 2.x (readValue -> std::string) y 3.x (readValue -> String).
+// - No imprime nada: devuelve el motivo del fallo y quien llama decide qué mostrar.
 #include <BLEDevice.h>
 #include <BLEUtils.h>
 #include <BLEClient.h>
@@ -19,8 +20,9 @@ struct LecturaMiFlora {
 
 static BLEClient* clienteBLE = nullptr;
 
-// Devuelve true solo si la lectura es válida. Si falla, NO hay datos (no se envían ceros).
-bool leerMiFlora(LecturaMiFlora& out)
+// Devuelve true solo si la lectura es válida. Si falla, NO hay datos (no se envían ceros)
+// y en 'error' queda el motivo.
+bool leerMiFlora(LecturaMiFlora& out, const char*& error)
 {
   if (clienteBLE == nullptr)
   {
@@ -31,11 +33,12 @@ bool leerMiFlora(LecturaMiFlora& out)
   BLEAddress direccion(MIFLORA_MAC);
   if (!clienteBLE->connect(direccion))
   {
-    Serial.println("MiFlora: no se pudo conectar");
+    error = "no conecta por BLE (¿fuera de alcance o sin pila?)";
     return false;
   }
 
   bool ok = false;
+  error = nullptr;
   BLERemoteService* servicio = clienteBLE->getService(serviceUUID);
   BLERemoteCharacteristic* escritura = servicio ? servicio->getCharacteristic(writeUUID) : nullptr;
   BLERemoteCharacteristic* datos = servicio ? servicio->getCharacteristic(sensorDataUUID) : nullptr;
@@ -61,17 +64,16 @@ bool leerMiFlora(LecturaMiFlora& out)
       // Valores imposibles = lectura corrupta
       ok = out.temperatura > -40 && out.temperatura < 70 && out.humedad <= 100 &&
            out.conductividad <= 20000 && out.luz_lux <= 200000;
-      Serial.printf("MiFlora: %.1f °C, %u lux, %u %%, %u µS/cm%s\n", out.temperatura,
-                    (unsigned)out.luz_lux, out.humedad, out.conductividad, ok ? "" : "  (DESCARTADA)");
+      if (!ok) error = "valores fuera de rango (lectura corrupta)";
     }
     else
     {
-      Serial.printf("MiFlora: respuesta inesperada (longitud %u)\n", (unsigned)len);
+      error = "respuesta demasiado corta";
     }
   }
   else
   {
-    Serial.println("MiFlora: servicio o características no encontrados");
+    error = "servicio o características no encontrados";
   }
 
   clienteBLE->disconnect();

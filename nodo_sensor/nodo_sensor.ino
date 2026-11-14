@@ -48,7 +48,8 @@ void enviarEstado()
 void logPeriodico()
 {
   char extra[64];
-  snprintf(extra, sizeof(extra), "puente=%u nodos=%u", g_puenteId, (unsigned)mesh.getNodeList().size());
+  snprintf(extra, sizeof(extra), "puente=%s nodos=%u enviados=%lu (datos simulados)",
+           g_puenteId ? "ok" : "NO", (unsigned)mesh.getNodeList().size(), (unsigned long)g_seq);
   logMemoria(extra);
 }
 
@@ -64,7 +65,7 @@ void setup()
   identificarPlaca();
   Serial.printf("\nBaliza %s (%s) -> rol: NODO DE PRUEBA (datos simulados)\n", g_nombre, g_mac);
 
-  mesh.setDebugMsgTypes(ERROR | STARTUP | CONNECTION);
+  mesh.setDebugMsgTypes(MESH_DEBUG);
   mesh.init(MESH_PREFIX, MESH_PASSWORD, &userScheduler, MESH_PORT, WIFI_AP_STA, MESH_CHANNEL);
   mesh.setContainsRoot(true);
   mesh.onReceive(&receivedCallback);

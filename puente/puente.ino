@@ -13,6 +13,8 @@ painlessMesh mesh;
 
 static IPAddress stationIP(0, 0, 0, 0);
 static unsigned long ultimoConIP = 0;
+static volatile uint32_t nDesconexWifi = 0;   // desconexiones de la WiFi fieldshift (se cuentan, no se imprimen una a una)
+static volatile uint8_t ultimoMotivoWifi = 0;
 
 void anunciar();
 void enviarEstado();
@@ -81,9 +83,10 @@ void enviarEstado()
 
 void logPeriodico()
 {
-  char extra[96];
-  snprintf(extra, sizeof(extra), "mqtt=%d nodos=%u publicados=%lu fallos=%lu descartados=%lu",
-           mqttClient.state(), (unsigned)mesh.getNodeList().size(),
+  char extra[128];
+  snprintf(extra, sizeof(extra), "wifi=%s desconex=%lu mqtt=%s nodos=%u publicados=%lu fallos=%lu descartados=%lu",
+           stationIP != IPAddress(0, 0, 0, 0) ? "ok" : "NO", (unsigned long)nDesconexWifi,
+           mqttClient.connected() ? "ok" : "NO", (unsigned)mesh.getNodeList().size(),
            (unsigned long)nPublicados, (unsigned long)nFallos, (unsigned long)nDescartados);
   logMemoria(extra);
 }
@@ -100,7 +103,7 @@ void setup()
   identificarPlaca();
   Serial.printf("\nBaliza %s (%s) -> rol: PUENTE\n", g_nombre, g_mac);
 
-  mesh.setDebugMsgTypes(ERROR | STARTUP | CONNECTION);
+  mesh.setDebugMsgTypes(MESH_DEBUG);
   mesh.init(MESH_PREFIX, MESH_PASSWORD, &userScheduler, MESH_PORT, WIFI_AP_STA, MESH_CHANNEL);
   mesh.stationManual(STATION_SSID, STATION_PASSWORD);
   mesh.setHostname(BRIDGE_HOSTNAME);
@@ -108,7 +111,8 @@ void setup()
   mesh.setContainsRoot(true);
 
   WiFi.onEvent([](WiFiEvent_t event, WiFiEventInfo_t info) {
-    Serial.printf("WiFi STA desconectada, motivo=%u\n", info.wifi_sta_disconnected.reason);
+    nDesconexWifi++;
+    ultimoMotivoWifi = info.wifi_sta_disconnected.reason;
   }, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
 
   mesh.onReceive(&receivedCallback);
@@ -134,7 +138,8 @@ void loop()
   if (ip != stationIP)
   {
     stationIP = ip;
-    Serial.printf("WiFi %s: IP %s\n", STATION_SSID, ip.toString().c_str());
+    if (hayIP) Serial.printf("WiFi %s: conectada, IP %s\n", STATION_SSID, ip.toString().c_str());
+    else       Serial.printf("WiFi %s: perdida (motivo=%u)\n", STATION_SSID, ultimoMotivoWifi);
   }
   if (hayIP) ultimoConIP = millis();
   else ultimoMqttOk = millis();   // sin IP manda la regla MAX_SIN_IP_MS, no la de MQTT

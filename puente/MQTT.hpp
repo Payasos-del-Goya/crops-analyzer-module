@@ -24,13 +24,22 @@ void InitMqtt()
 }
 
 // Un intento como mucho cada MQTT_RECONNECT_INTERVAL, para no bloquear la malla
+// Por serie solo se avisa de los cambios: conectado, perdido y el primer fallo de cada racha.
 void HandleMqtt(bool hasIp)
 {
+  static bool estabaConectado = false;
+  static bool falloAvisado = false;
+
   if (mqttClient.connected())
   {
     mqttClient.loop();
     ultimoMqttOk = millis();
     return;
+  }
+  if (estabaConectado)
+  {
+    Serial.printf("MQTT: conexión perdida (rc=%d)\n", mqttClient.state());
+    estabaConectado = false;
   }
   if (!hasIp) return;
 
@@ -38,16 +47,19 @@ void HandleMqtt(bool hasIp)
   if (lastMqttAttempt != 0 && now - lastMqttAttempt < MQTT_RECONNECT_INTERVAL) return;
   lastMqttAttempt = now;
 
-  Serial.printf("MQTT: conectando como %s... ", mqttClientId);
   if (mqttClient.connect(mqttClientId, MQTT_USER, MQTT_PASSWORD))
   {
-    Serial.println("conectado");
+    Serial.printf("MQTT: conectado como %s\n", mqttClientId);
     mqttClient.subscribe(MQTT_TOPIC_BROADCAST);
     ultimoMqttOk = millis();
+    estabaConectado = true;
+    falloAvisado = false;
   }
-  else
+  else if (!falloAvisado)
   {
-    Serial.printf("fallo, rc=%d\n", mqttClient.state());
+    Serial.printf("MQTT: no conecta (rc=%d), se reintenta cada %lu s\n",
+                  mqttClient.state(), MQTT_RECONNECT_INTERVAL / 1000);
+    falloAvisado = true;
   }
 }
 

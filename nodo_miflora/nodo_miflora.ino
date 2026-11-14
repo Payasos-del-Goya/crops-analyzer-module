@@ -16,6 +16,7 @@ painlessMesh mesh;
 static LecturaMiFlora ultima;
 static unsigned long ultimaMs = 0;     // 0 = nunca ha habido lectura válida
 static portMUX_TYPE muxSensor = portMUX_INITIALIZER_UNLOCKED;
+static volatile uint32_t nFallosMiFlora = 0;
 
 void enviarLecturas();
 void enviarEstado();
@@ -28,16 +29,30 @@ Task tLog(PERIODO_LOG_MS, TASK_FOREVER, &logPeriodico);
 void tareaSensor(void*)
 {
   vTaskDelay(pdMS_TO_TICKS(10000));   // dejar que la malla arranque primero
+  bool estabaOk = false, primera = true;
   for (;;)
   {
     LecturaMiFlora l;
-    if (leerMiFlora(l))
+    const char* error = nullptr;
+    if (leerMiFlora(l, error))
     {
       portENTER_CRITICAL(&muxSensor);
       ultima = l;
       ultimaMs = millis();
       portEXIT_CRITICAL(&muxSensor);
+      if (!estabaOk)   // solo se avisa al recuperar la lectura; los valores van en el resumen periódico
+        Serial.printf("MiFlora: leyendo OK (%.1f °C, %u %%, %u µS/cm, %lu lux)\n",
+                      l.temperatura, l.humedad, l.conductividad, (unsigned long)l.luz_lux);
+      estabaOk = true;
     }
+    else
+    {
+      nFallosMiFlora++;
+      if (estabaOk || primera)   // solo el primer fallo de cada racha
+        Serial.printf("MiFlora: fallo (%s); no se envían datos de campo hasta que vuelva\n", error);
+      estabaOk = false;
+    }
+    primera = false;
     vTaskDelay(pdMS_TO_TICKS(MIFLORA_PERIODO_MS));
   }
 }
@@ -55,11 +70,7 @@ static bool lecturaReciente(LecturaMiFlora& l)
 void enviarLecturas()
 {
   LecturaMiFlora l;
-  if (!lecturaReciente(l))
-  {
-    Serial.println("Sin lectura reciente del MiFlora: no se envían datos de campo");
-    return;
-  }
+  if (!lecturaReciente(l)) return;   // el aviso lo da la tarea del sensor al fallar
   char json[TAM_JSON];
 
   snprintf(json, sizeof(json),
@@ -84,8 +95,17 @@ void enviarEstado()
 
 void logPeriodico()
 {
-  char extra[64];
-  snprintf(extra, sizeof(extra), "puente=%u nodos=%u", g_puenteId, (unsigned)mesh.getNodeList().size());
+  LecturaMiFlora l;
+  bool ok = lecturaReciente(l);
+  char extra[128];
+  if (ok)
+    snprintf(extra, sizeof(extra), "puente=%s nodos=%u enviados=%lu | miflora %.1f°C %u%% %uµS/cm %lulux fallos=%lu",
+             g_puenteId ? "ok" : "NO", (unsigned)mesh.getNodeList().size(), (unsigned long)g_seq,
+             l.temperatura, l.humedad, l.conductividad, (unsigned long)l.luz_lux, (unsigned long)nFallosMiFlora);
+  else
+    snprintf(extra, sizeof(extra), "puente=%s nodos=%u enviados=%lu | miflora SIN DATOS fallos=%lu",
+             g_puenteId ? "ok" : "NO", (unsigned)mesh.getNodeList().size(), (unsigned long)g_seq,
+             (unsigned long)nFallosMiFlora);
   logMemoria(extra);
 }
 
@@ -101,7 +121,7 @@ void setup()
   identificarPlaca();
   Serial.printf("\nBaliza %s (%s) -> rol: NODO MIFLORA (%s)\n", g_nombre, g_mac, MIFLORA_MAC);
 
-  mesh.setDebugMsgTypes(ERROR | STARTUP | CONNECTION);
+  mesh.setDebugMsgTypes(MESH_DEBUG);
   mesh.init(MESH_PREFIX, MESH_PASSWORD, &userScheduler, MESH_PORT, WIFI_AP_STA, MESH_CHANNEL);
   mesh.setContainsRoot(true);
   mesh.onReceive(&receivedCallback);
