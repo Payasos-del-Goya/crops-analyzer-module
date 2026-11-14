@@ -1,0 +1,5 @@
+# Salida de compilación de arduino-cli / Arduino IDE
+build/
+*.bin
+*.elf
+*.map
