@@ -63,7 +63,7 @@ void HandleMqtt(bool hasIp)
   }
 }
 
-// Publica en fieldshift/c001/<dispositivo>/<tipo>. En "estado" añade "gateway" (el nombre del puente).
+// Publica en plot-advisor/c001/<dispositivo>/<tipo>. En "estado" añade "gateway" (el nombre del puente).
 void Publicar(const char* tipo, const char* dispositivo, const char* json, size_t len)
 {
   static char topic[64];

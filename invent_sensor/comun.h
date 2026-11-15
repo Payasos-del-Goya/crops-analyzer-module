@@ -11,10 +11,10 @@
 #include "painlessMesh.h"
 
 // ---- Malla painlessMesh (idéntico en todas las placas) ----
-#define MESH_PREFIX     "MyMeshNetwork"
-#define MESH_PASSWORD   "somethingSneaky"
+#define MESH_PREFIX     "MeshPlotAdvisor"
+#define MESH_PASSWORD   "secretoDeMesh123"
 #define MESH_PORT       5555
-#define MESH_CHANNEL    1        // el mismo canal que la WiFi fieldshift de la Raspberry
+#define MESH_CHANNEL    1        // el mismo canal que la WiFi plot-advisor de la Raspberry
 
 // ---- Datos ----
 #define FINCA                    "demo"

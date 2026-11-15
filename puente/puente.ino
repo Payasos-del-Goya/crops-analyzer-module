@@ -1,5 +1,5 @@
 // Puente de la malla: recibe los mensajes de las balizas por painlessMesh y los publica por MQTT
-// en la Raspberry Pi (WiFi fieldshift). Formato: FORMATO_DATOS.md
+// en la Raspberry Pi (WiFi plot-advisor). Formato: FORMATO_DATOS.md
 #include "painlessMesh.h"
 #include <WiFi.h>
 #include <PubSubClient.h>
@@ -13,7 +13,7 @@ painlessMesh mesh;
 
 static IPAddress stationIP(0, 0, 0, 0);
 static unsigned long ultimoConIP = 0;
-static volatile uint32_t nDesconexWifi = 0;   // desconexiones de la WiFi fieldshift (se cuentan, no se imprimen una a una)
+static volatile uint32_t nDesconexWifi = 0;   // desconexiones de la WiFi plot-advisor (se cuentan, no se imprimen una a una)
 static volatile uint8_t ultimoMotivoWifi = 0;
 
 void anunciar();

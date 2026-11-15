@@ -113,7 +113,7 @@ void logPeriodico()
 void receivedCallback(uint32_t from, String& msg)
 {
   if (procesarAnuncioPuente(from, msg)) return;
-  Serial.printf("Malla: de %u: %s\n", from, msg.c_str());   // p. ej. lo enviado a fieldshift/c001/to/broadcast
+  Serial.printf("Malla: de %u: %s\n", from, msg.c_str());   // p. ej. lo enviado a plot-advisor/c001/to/broadcast
 }
 
 void setup()

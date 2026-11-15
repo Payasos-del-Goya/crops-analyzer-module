@@ -9,9 +9,9 @@ cambiarlo, porque hay que tocar también la configuración de Telegraf.
 
 | Topic MQTT                                   | Measurement en InfluxDB | Bucket        | Cada cuánto |
 |----------------------------------------------|-------------------------|---------------|-------------|
-| `fieldshift/c001/<dispositivo>/suelo`        | `suelo`                 | `c001_campo`  | 30 s (demo) |
-| `fieldshift/c001/<dispositivo>/atmosfera`    | `atmosfera`             | `c001_campo`  | 30 s (demo) |
-| `fieldshift/c001/<dispositivo>/estado`       | `dispositivo`           | `c001_estado` | 60 s        |
+| `plot-advisor/c001/<dispositivo>/suelo`        | `suelo`                 | `c001_campo`  | 30 s (demo) |
+| `plot-advisor/c001/<dispositivo>/atmosfera`    | `atmosfera`             | `c001_campo`  | 30 s (demo) |
+| `plot-advisor/c001/<dispositivo>/estado`       | `dispositivo`           | `c001_estado` | 60 s        |
 
 - `c001` es el cliente de la demo. `<dispositivo>` es el nombre corto de la baliza (ver abajo).
 - Todo lo publica **el nodo puente** en nombre de cada baliza: las balizas mandan el JSON por la
@@ -97,7 +97,7 @@ Datos reales de la propia placa (no dependen de sensores).
 | `dispositivo` | texto   | tag         |                                                                           |
 | `tipo`        | texto   | tag         | `puente` o `baliza`                                                       |
 | `bateria_v`   | decimal | field       | V. **Omitir la clave** si la placa no puede medirla (no mandar 0)          |
-| `rssi`        | entero  | field       | dBm. Puente: `WiFi.RSSI()` de la conexión a `fieldshift`. Baliza: RSSI del enlace de malla |
+| `rssi`        | entero  | field       | dBm. Puente: `WiFi.RSSI()` de la conexión a `plot-advisor`. Baliza: RSSI del enlace de malla |
 | `snr`         | decimal | field       | dB. Solo aplica a LoRa: **omitir** con WiFi                                |
 | `seq`         | entero  | field       | contador de mensajes de esa baliza; vuelve a 0 al reiniciar               |
 | `sensores_ok` | entero  | field       | nº de sensores con lectura reciente válida (0 sin sensores o si fallan)   |
@@ -138,7 +138,7 @@ Hay tres sketches independientes. Abrir y cargar cada carpeta como un proyecto A
 
 | Sketch | Placa | Qué hace |
 |---|---|---|
-| `puente/puente.ino` | ID derivado de su MAC | Único puente: conecta a `fieldshift` y publica por MQTT lo que llega por la malla, más su propio estado |
+| `puente/puente.ino` | ID derivado de su MAC | Único puente: conecta a `plot-advisor` y publica por MQTT lo que llega por la malla, más su propio estado |
 | `nodo_miflora/nodo_miflora.ino` | ID derivado de su MAC | Lee el MiFlora por BLE (`config.h`) y manda suelo, atmósfera y estado |
 | `nodo_sensor/nodo_sensor.ino` | ID derivado de su MAC | Nodo de prueba: **luz real** (sensor analógico, pin 34, `luz_lux` en un mensaje de atmósfera propio sin `simulado`); suelo y resto de atmósfera **simulados** (marcados); estado real |
 
@@ -146,7 +146,7 @@ Hay tres sketches independientes. Abrir y cargar cada carpeta como un proyecto A
   watchdog, estado). Si se cambia, hay que copiarlo a las tres.
 - Mensajes dentro de la malla (texto, sin librería JSON): `<tipo>|<dispositivo>|<json>`. Los nodos
   los envían **solo al puente** (`sendSingle`); el puente se anuncia cada 10 s con `P|<dispositivo>`.
-  El puente valida la cabecera y publica el JSON tal cual en `fieldshift/c001/<dispositivo>/<tipo>`.
+  El puente valida la cabecera y publica el JSON tal cual en `plot-advisor/c001/<dispositivo>/<tipo>`.
 - Memoria: los mensajes se construyen con `snprintf` en búferes fijos (sin `String`/`JSONVar`
   encadenados) para no fragmentar el heap; el cliente BLE del MiFlora se crea una sola vez.
 - Robustez: watchdog de 30 s en `loop()` en todas las placas; el puente se reinicia solo si pasa
