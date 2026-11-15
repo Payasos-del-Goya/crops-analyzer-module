@@ -186,9 +186,7 @@ un cargador compatible con baterías Li-ion.
 ## Estudio de precio de ensamblaje
 
 Este es un presupuesto orientativo de **materiales para una baliza Sensor**,
-consultado en AliExpress el 15/11/2026. Los precios están en USD, sin IVA,
-convertidos a euros con `1 USD = 0,907291 EUR` (tipo de cambio del
-[15/11/2026](https://www.x-rates.com/historical/?from=USD&amount=1&date=2026-11-15)).
+consultado en AliExpress el 15/11/2026.
 No incluyen envío ni posibles cupones. Algunas ofertas son por lotes, por lo
 que hay que seleccionar la opción de una unidad al comprar.
 
