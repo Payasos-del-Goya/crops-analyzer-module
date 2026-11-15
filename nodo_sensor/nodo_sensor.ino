@@ -5,6 +5,7 @@
 #include "painlessMesh.h"
 #include <WiFi.h>
 #include <DHT11.h>
+#include "esp_random.h"
 
 #include "comun.h"
 
@@ -35,7 +36,18 @@ static int ultimaLuz = -1;
 static int ultimaHumedad = -1;
 static int ultimaTemperatura = -1;
 static int ultimaHumedadAire = -1;
+static double ultimoPh = -1;
 
+float random_01(float min, float max) {
+    int a = min * 10;
+    int b = max * 10;
+    return (a + (esp_random() % (b - a + 1))) / 10.0f;
+}
+
+static float leerPh()
+{
+  return random_01(6.0, 8.0);
+}
 
 static int leerLuz()
 {
@@ -68,6 +80,7 @@ void enviarLecturas()
   ultimaTemperatura = leerTemperatura();
   ultimaLuz = leerLuz();
   ultimaHumedadAire = leerHumedadAire();
+  ultimoPh = leerPh();
   snprintf(json, sizeof(json),
     "{\"finca\":\"%s\",\"dispositivo\":\"%s\",\"temp_aire\":%d,\"luz_lux\":%d,\"hr\":%d}",
     FINCA, g_nombre, ultimaTemperatura, ultimaLuz, ultimaHumedadAire);
@@ -76,8 +89,8 @@ void enviarLecturas()
 
   ultimaHumedad = leerHumedadTierra();
   snprintf(json, sizeof(json),
-    "{\"finca\":\"%s\",\"zona\":\"%s\",\"dispositivo\":\"%s\",\"tipo\":\"fc28\",\"profundidad_cm\":%d,\"humedad_vol\":%d}",
-    FINCA, ZONA, g_nombre, PROFUNDIDAD_FC28_CM, ultimaHumedad);
+    "{\"finca\":\"%s\",\"dispositivo\":\"%s\",\"tipo\":\"fc28\",\"profundidad_cm\":%d,\"humedad_vol\":%d,\"ph\":%.1f}",
+    FINCA, g_nombre, PROFUNDIDAD_FC28_CM, ultimaHumedad, ultimoPh);
   enviarAlPuente(mesh, "suelo", json);
 
 }

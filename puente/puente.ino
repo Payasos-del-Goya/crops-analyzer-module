@@ -18,10 +18,53 @@ static volatile uint8_t ultimoMotivoWifi = 0;
 
 void anunciar();
 void enviarEstado();
+void enviarLecturas();
 void logPeriodico();
 Task tAnuncio(PERIODO_ANUNCIO_MS, TASK_FOREVER, &anunciar);
 Task tEstado(PERIODO_ESTADO_MS, TASK_FOREVER, &enviarEstado);
+Task tLecturas(PERIODO_LECTURAS_MS, TASK_FOREVER, &enviarLecturas);
 Task tLog(PERIODO_LOG_MS, TASK_FOREVER, &logPeriodico);
+
+static int ultimaLuz = -1;
+static int ultimaHumedad = -1;
+static int ultimaTemperatura = -1;
+static int ultimaHumedadAire = -1;
+static double ultimoPh = -1;
+
+float random_01(float min, float max) {
+    int a = min * 10;
+    int b = max * 10;
+    return (a + (esp_random() % (b - a + 1))) / 10.0f;
+}
+
+int random_int(int min, int max) {
+    return min + (esp_random() % (max - min + 1));
+}
+
+static float leerPh()
+{
+  return random_01(6.0, 8.0);
+}
+
+static int leerLuz()
+{
+  return random_int(500, 550);
+}
+
+static int leerHumedadTierra()
+{
+  return random_int(33, 40);
+}
+
+static int leerHumedadAire()
+{
+  return random_int(30, 35);
+}
+
+static int leerTemperatura()
+{
+  return random_int(20, 25);
+}
 
 static bool tipoValido(const char* t, size_t n)
 {
@@ -81,6 +124,28 @@ void enviarEstado()
   }
 }
 
+void enviarLecturas()
+{
+  char json[TAM_JSON];
+
+  ultimaTemperatura = leerTemperatura();
+  ultimaLuz = leerLuz();
+  ultimaHumedadAire = leerHumedadAire();
+  ultimoPh = leerPh();
+  snprintf(json, sizeof(json),
+    "{\"finca\":\"%s\",\"dispositivo\":\"%s\",\"temp_aire\":%d,\"luz_lux\":%d,\"hr\":%d}",
+    FINCA, g_nombre, ultimaTemperatura, ultimaLuz, ultimaHumedadAire);
+  Serial.println(json);
+  Publicar("atmosfera", g_nombre, json, strlen(json));
+
+  ultimaHumedad = leerHumedadTierra();
+  snprintf(json, sizeof(json),
+    "{\"finca\":\"%s\",\"dispositivo\":\"%s\",\"tipo\":\"fc28\",\"profundidad_cm\":%d,\"humedad_vol\":%d,\"ph\":%.1f}",
+    FINCA, g_nombre, 5, ultimaHumedad, ultimoPh);
+  Publicar("suelo", g_nombre, json, strlen(json));
+
+}
+
 void logPeriodico()
 {
   char extra[128];
@@ -122,6 +187,7 @@ void setup()
   ultimoConIP = millis();
 
   userScheduler.addTask(tAnuncio);  tAnuncio.enable();
+  userScheduler.addTask(tLecturas); tLecturas.enableDelayed(10000);
   userScheduler.addTask(tEstado);   tEstado.enableDelayed(15000);
   userScheduler.addTask(tLog);      tLog.enable();
 

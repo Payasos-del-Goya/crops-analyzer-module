@@ -18,6 +18,10 @@ Task tLecturas(PERIODO_LECTURAS_MS, TASK_FOREVER, &enviarLecturas);
 Task tEstado(PERIODO_ESTADO_MS, TASK_FOREVER, &enviarEstado);
 Task tLog(PERIODO_LOG_MS, TASK_FOREVER, &logPeriodico);
 
+static int ultimaLuz = -1;
+static int ultimaHumedad = -1;
+static int ultimaTemperatura = -1;
+static int ultimaHumedadAire = -1;
 static double ultimoPh = -1;
 
 float random_01(float min, float max) {
@@ -26,19 +30,53 @@ float random_01(float min, float max) {
     return (a + (esp_random() % (b - a + 1))) / 10.0f;
 }
 
+int random_int(int min, int max) {
+    return min + (esp_random() % (max - min + 1));
+}
+
 static float leerPh()
 {
   return random_01(6.0, 8.0);
+}
+
+static int leerLuz()
+{
+  return random_int(500, 550);
+}
+
+static int leerHumedadTierra()
+{
+  return random_int(33, 40);
+}
+
+static int leerHumedadAire()
+{
+  return random_int(30, 35);
+}
+
+static int leerTemperatura()
+{
+  return random_int(20, 25);
 }
 
 void enviarLecturas()
 {
   char json[TAM_JSON];
 
+  ultimaTemperatura = leerTemperatura();
+  ultimaLuz = leerLuz();
+  ultimaHumedadAire = leerHumedadAire();
   ultimoPh = leerPh();
   snprintf(json, sizeof(json),
-    "{\"finca\":\"%s\",\"zona\":\"%s\",\"dispositivo\":\"%s\",\"ph\":%.1f}",
-    FINCA, ZONA, g_nombre, ultimoPh);
+    "{\"finca\":\"%s\",\"dispositivo\":\"%s\",\"temp_aire\":%d,\"luz_lux\":%d,\"hr\":%d}",
+    FINCA, g_nombre, ultimaTemperatura, ultimaLuz, ultimaHumedadAire);
+  Serial.println(json);
+  enviarAlPuente(mesh, "atmosfera", json);
+
+  ultimaHumedad = leerHumedadTierra();
+  snprintf(json, sizeof(json),
+    "{\"finca\":\"%s\",\"dispositivo\":\"%s\",\"tipo\":\"fc28\",\"profundidad_cm\":%d,\"humedad_vol\":%d,\"ph\":%.1f}",
+    FINCA, g_nombre, 5, ultimaHumedad, ultimoPh);
   enviarAlPuente(mesh, "suelo", json);
 
 }

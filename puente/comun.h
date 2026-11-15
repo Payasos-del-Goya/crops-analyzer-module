@@ -18,7 +18,6 @@
 
 // ---- Datos ----
 #define FINCA                    "demo"
-#define ZONA                     "A"
 #define PERIODO_LECTURAS_MS      30000UL   // suelo + atmósfera
 #define PERIODO_ESTADO_MS        60000UL   // estado de la placa
 #define PERIODO_ANUNCIO_MS       10000UL   // el puente anuncia quién es

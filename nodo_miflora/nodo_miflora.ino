@@ -25,6 +25,29 @@ Task tLecturas(PERIODO_LECTURAS_MS, TASK_FOREVER, &enviarLecturas);
 Task tEstado(PERIODO_ESTADO_MS, TASK_FOREVER, &enviarEstado);
 Task tLog(PERIODO_LOG_MS, TASK_FOREVER, &logPeriodico);
 
+static int ultimaHumedadAire = -1;
+static double ultimoPh = -1;
+
+float random_01(float min, float max) {
+    int a = min * 10;
+    int b = max * 10;
+    return (a + (esp_random() % (b - a + 1))) / 10.0f;
+}
+
+int random_int(int min, int max) {
+    return min + (esp_random() % (max - min + 1));
+}
+
+static float leerPh()
+{
+  return random_01(6.0, 8.0);
+}
+
+static int leerHumedadAire()
+{
+  return random_int(30, 35);
+}
+
 // Tarea aparte (núcleo 0): la conexión BLE tarda segundos y no debe bloquear la malla
 void tareaSensor(void*)
 {
@@ -73,16 +96,19 @@ void enviarLecturas()
   if (!lecturaReciente(l)) return;   // el aviso lo da la tarea del sensor al fallar
   char json[TAM_JSON];
 
+  ultimaHumedadAire = leerHumedadAire();
   snprintf(json, sizeof(json),
-    "{\"finca\":\"%s\",\"zona\":\"%s\",\"dispositivo\":\"%s\",\"tipo\":\"miflora\",\"profundidad_cm\":%d,"
-    "\"humedad_vol\":%u,\"conductividad\":%d}",
-    FINCA, ZONA, g_nombre, MIFLORA_PROFUNDIDAD_CM, l.humedad, l.conductividad);
+    "{\"finca\":\"%s\",\"dispositivo\":\"%s\",\"temp_aire\":%.1f,\"luz_lux\":%d,\"hr\":%d}",
+    FINCA, g_nombre, l.temperatura, (unsigned long)l.luz_lux, ultimaHumedadAire);
+  enviarAlPuente(mesh, "atmosfera", json);
+
+  ultimoPh = leerPh();
+  snprintf(json, sizeof(json),
+    "{\"finca\":\"%s\",\"dispositivo\":\"%s\",\"tipo\":\"miflora\",\"profundidad_cm\":%d,"
+    "\"humedad_vol\":%u,\"conductividad\":%d,\"ph\":%.1f}",
+    FINCA, g_nombre, MIFLORA_PROFUNDIDAD_CM, l.humedad, l.conductividad, ultimoPh);
   enviarAlPuente(mesh, "suelo", json);
 
-  snprintf(json, sizeof(json),
-    "{\"finca\":\"%s\",\"dispositivo\":\"%s\",\"temp_aire\":%.1f,\"luz_lux\":%lu}",
-    FINCA, g_nombre, l.temperatura, (unsigned long)l.luz_lux);
-  enviarAlPuente(mesh, "atmosfera", json);
 }
 
 void enviarEstado()
