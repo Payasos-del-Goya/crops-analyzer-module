@@ -148,6 +148,8 @@ corriente real depende también de la alimentación, sensores, picos de RF,
 ACK, reintentos y tráfico interno de la malla. Para validarla se necesita
 medir la corriente en la alimentación con un instrumento externo.
 
+Como el firmware no mide directamente la duración real de cada estado RF ni la corriente instantánea, se utilizan tiempos aproximados y valores máximos del datasheet. Esto puede sobredimensionar el consumo calculado y producir una autonomía inferior a la real, aunque no constituye un límite máximo garantizado.
+
 ### 4. Duración con una batería 18650
 
 Tomando el consumo estimado de `31,24 mA` a `3,3 V`:
