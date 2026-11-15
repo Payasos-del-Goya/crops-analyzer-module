@@ -182,3 +182,47 @@ USB-serie y los picos de transmisión WiFi.
 Una 18650 cargada alcanza `4,2 V`: no debe conectarse directamente a `3V3` ni
 `5V`. Hay que usar un regulador adecuado, protección contra sobredescarga y
 un cargador compatible con baterías Li-ion.
+
+## Estudio de precio de ensamblaje
+
+Este es un presupuesto orientativo de **materiales para una baliza Sensor**,
+consultado en AliExpress el 15/11/2026. Los precios están en USD, sin IVA,
+convertidos a euros con `1 USD = 0,907291 EUR` (tipo de cambio del
+[15/11/2026](https://www.x-rates.com/historical/?from=USD&amount=1&date=2026-11-15)).
+No incluyen envío ni posibles cupones. Algunas ofertas son por lotes, por lo
+que hay que seleccionar la opción de una unidad al comprar.
+
+| Componente | Cantidad | Precio orientativo | Fuente |
+|---|---:|---:|---|
+| Placa ESP32-WROOM-32 CP2102 | 1 | 8,49 EUR | [AliExpress](https://www.aliexpress.com/item/1005009719511018.html) |
+| Sensor de humedad FC-28 | 1 | 1,70 EUR | [AliExpress](https://www.aliexpress.com/item/1005008464490052.html) |
+| Sensor de temperatura/humedad DHT11 | 1 | 1,89 EUR | [AliExpress](https://www.aliexpress.com/item/1005008511434804.html) |
+| Sensor de luz LDR analógico | 1 | 0,99 EUR | [AliExpress](https://www.aliexpress.com/item/1005009980841298.html) |
+| Batería 18650 protegida, 3000 mAh | 1 | 7,39 EUR | [AliExpress](https://www.aliexpress.com/item/1005012835443275.html) |
+| Cargador solar Li-ion CN3065 | 1 | 0,51 EUR | [AliExpress](https://www.aliexpress.com/item/1005009750528312.html) |
+| Elevador DC-DC a 5 V | 1 | 0,39 EUR | [AliExpress](https://es.aliexpress.com/item/1005008773886060.html) |
+| Mini Panel Solar de Silicio Monocristalino de 6V 200MA 1.2W | 1 | 5,43 EUR | [AliExpress](https://es.aliexpress.com/item/1005012696225823.html) |
+| Portabatería para una 18650 | 1 | 1,03 EUR | [AliExpress](https://www.aliexpress.com/item/1005006160957345.html) |
+| Caja estanca IP65 | 1 | 5,47 EUR | [AliExpress](https://www.aliexpress.com/item/1005003402714698.html) |
+| Cableado/conectores Dupont | 1 lote | ~0,36 EUR | [AliExpress](https://www.aliexpress.com/item/1005004516091631.html) |
+| Módulo LoRa + antena | 1 lote | 8,59 EUR | [AliExpress](https://es.aliexpress.com/item/1005011899716097.html) |
+| Módulo Sensor de PH | 1 lote | 16,99 EUR | [AliExpress](https://es.aliexpress.com/item/1005012537261604.html) |
+
+### Total orientativo
+
+```text
+Componentes y montaje físico básico ≈ 59,23 EUR por baliza
+Reserva del 10 % para tornillos, prensaestopas y consumibles ≈ 5,92 EUR
+Total recomendado ≈ 65,15 EUR por baliza
+```
+
+El panel elegido ya incluye un soporte orientable pequeño. La caja IP65
+protege la electrónica, pero hay que practicar los orificios y sellar los
+cables; el coste de esos elementos está incluido solo como reserva. El
+portabatería se incluye aunque algunas placas ESP32 para 18650 ya lo integran.
+
+Este presupuesto sí incluye el módulo LoRa y el sensor de pH listados, aunque el
+firmware actual todavía simula el pH. No incluye mano de obra, herramientas,
+transporte, impuestos o sustituciones por componentes de mayor calidad. Para una instalación exterior conviene
+verificar que la batería tiene protección y que el módulo CN3065 es compatible
+con el panel y la batería elegidos.
