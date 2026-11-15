@@ -26,18 +26,18 @@ reales.
 
 #### Montaje
 
-![Placa ESP32 conectada por USB](assets/sensor_esp32.jpg)
+<img src="assets/sensor_esp32.jpg" alt="Placa ESP32 conectada por USB" width="400">
 
 *La ESP32 es el controlador del nodo. Se alimenta y se programa por USB; los
 sensores se conectan a sus pines de alimentación, tierra y entrada de señal.*
 
-![Cableado de la ESP32](assets/sensor_esp32_cables.jpg)
+<img src="assets/sensor_esp32_cables.jpg" alt="Cableado de la ESP32" width="400">
 
 *Vista del cableado entre la ESP32 y la protoboard. Antes de encender el
 montaje, comprueba que todos los sensores comparten `GND` y que las entradas
 analógicas no reciben más de 3,3 V.*
 
-![Sensor de humedad de suelo FC-28](assets/sensor_fc-28.jpg)
+<img src="assets/sensor_fc-28.jpg" alt="Sensor de humedad de suelo FC-28" width="400">
 
 *El FC-28 se introduce en la tierra para medir la humedad relativa del sustrato.
 La sonda se conecta a la entrada analógica de humedad (`GPIO 35`). No debe
@@ -45,7 +45,7 @@ interpretarse como humedad volumétrica ni como conductividad en µS/cm sin una
 calibración específica; los valores `VOLTAJE_SECO_MV` y `VOLTAJE_MOJADO_MV`
 se ajustan en el firmware.*
 
-![Montaje completo en protoboard](assets/sensor_protoboard.jpg)
+<img src="assets/sensor_protoboard.jpg" alt="Montaje completo en protoboard" width="400">
 
 *Montaje de pruebas completo: ESP32, FC-28, sensor de luz y DHT11 sobre una
 protoboard. El sensor de luz se lee por `GPIO 34` y el DHT11 por `GPIO 21`.*
